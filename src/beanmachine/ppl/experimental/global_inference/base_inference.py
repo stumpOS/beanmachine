@@ -47,34 +47,84 @@ class BaseInference(metaclass=ABCMeta):
         num_adaptive_samples: int = 0,
         verbose: VerboseLevel = VerboseLevel.LOAD_BAR,
         initialize_from_prior: bool = False,
+        daskme: bool = False,
     ) -> MonteCarloSamples:
         _verify_queries_and_observations(
             queries, observations, observations_must_be_rv=True
         )
         chain_results = []
-        for _ in range(num_chains):
-            sampler = self.sampler(
-                queries,
-                observations,
-                num_samples,
-                num_adaptive_samples,
-                initialize_from_prior,
-            )
-            samples = {query: [] for query in queries}
-            # Main inference loop
-            for _ in trange(
-                num_samples + num_adaptive_samples,
-                desc="Samples collected",
-                disable=verbose == VerboseLevel.OFF,
-            ):
-                world = next(sampler)
-                # Extract samples
-                for query in queries:
-                    samples[query].append(world.call(query))
+        if not daskme:
+            for _ in range(num_chains):
+                sampler = self.sampler(
+                    queries,
+                    observations,
+                    num_samples,
+                    num_adaptive_samples,
+                    initialize_from_prior,
+                )
+                samples = {query: [] for query in queries}
+                # Main inference loop
+                for _ in trange(
+                    num_samples + num_adaptive_samples,
+                    desc="Samples collected",
+                    disable=verbose == VerboseLevel.OFF,
+                ):
+                    world = next(sampler)
+                    # Extract samples
+                    for query in queries:
+                        samples[query].append(world.call(query))
 
-            samples = {node: torch.stack(val) for node, val in samples.items()}
-            chain_results.append(samples)
-        return MonteCarloSamples(chain_results, num_adaptive_samples)
+                samples = {node: torch.stack(val) for node, val in samples.items()}
+                chain_results.append(samples)
+        elif num_chains > 1 and daskme:
+            from dask import compute, delayed
+            results = []
+            for _ in range(num_chains):
+                chain_query = delayed(self.daskify)(
+                    queries,
+                    observations,
+                    num_samples,
+                    num_adaptive_samples,
+                    initialize_from_prior,
+                    verbose,
+                )
+                results.append(chain_query)
+            chain_results = list(compute(*results))
+            samples = []
+            for chain_result in chain_results:
+                samples.append({node: value for node, value in zip(queries, chain_result)})
+        return MonteCarloSamples(samples, num_adaptive_samples)
+
+    def daskify(
+        self,
+        queries,
+        observations,
+        num_samples,
+        num_adaptive_samples,
+        initialize_from_prior,
+        verbose,
+    ):
+        sampler = self.sampler(
+            queries,
+            observations,
+            num_samples,
+            num_adaptive_samples,
+            initialize_from_prior,
+        )
+        samples = {query: [] for query in queries}
+        # Main inference loop
+        for _ in trange(
+            num_samples + num_adaptive_samples,
+            desc="Samples collected",
+            disable=verbose == VerboseLevel.OFF,
+        ):
+            world = next(sampler)
+            # Extract samples
+            for query in queries:
+                samples[query].append(world[query].detach().clone())
+
+        # return values in the same order as queries
+        return [torch.stack(samples[node]) for node in queries]
 
     def sampler(
         self,
