@@ -2,15 +2,19 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-
+import distutils.command.build_py
+import distutils.extension
 import os
 import platform
 import re
 import sys
 from glob import glob
+import shutil
 
 from pybind11.setup_helpers import build_ext, Pybind11Extension
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup, Extension
+from setuptools.command.build_py import build_py
+from distutils.command.build import build as _build
 
 
 REQUIRED_MAJOR = 3
@@ -124,6 +128,46 @@ elif sys.platform.startswith("darwin"):
         + glob("/usr/local/Cellar/boost/*/include")
     )
 
+# From torch.mlir: "Build phase discovery is unreliable. Just tell it what phases to run."
+class CustomBuild(_build):
+
+    def run(self):
+        self.run_command("build_py")
+        self.run_command("build_ext")
+        self.run_command("build_scripts")
+
+class NoopBuildExtension(build_ext):
+
+    def build_extension(self, ext):
+        pass
+
+class CMakeBuild(build_py):
+
+    def run(self):
+        target_dir = self.build_lib
+        # cmake_build_dir = os.getenv("PAIC_MLIR_CMAKE_BUILD_DIR")
+        cmake_build_dir = "/Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir/cmake-build-debug"
+        #cmake_build_dir = "/Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir/bm_build2"
+        if not cmake_build_dir:
+            cmake_build_dir = os.path.abspath(
+                os.path.join(target_dir, "..", "cmake_build"))
+        # if you end up storing the pybind module in a subdirectory, you have to update this
+        python_package_dir = cmake_build_dir
+        # TODO: build MLIR from source and add dialects. Check if already built first
+        if os.path.exists(target_dir):
+            shutil.rmtree(target_dir, ignore_errors=False, onerror=None)
+
+        shutil.copytree(python_package_dir,
+                        target_dir,
+                        symlinks=False)
+
+
+class CMakeExtension(Extension):
+
+  def __init__(self, name, sourcedir=""):
+    Extension.__init__(self, name, sources=[])
+    self.sourcedir = os.path.abspath(sourcedir)
+
 setup(
     name="beanmachine",
     version=version,
@@ -167,9 +211,14 @@ setup(
             ),
             include_dirs=INCLUDE_DIRS,
             extra_compile_args=CPP_COMPILE_ARGS,
-        )
+        ),
+        CMakeExtension(name="beanmachine.paic_mlir")
     ],
-    cmdclass={"build_ext": build_ext},
+    cmdclass={
+        "build": CustomBuild,
+        "built_ext": NoopBuildExtension,
+        "build_py": CMakeBuild,
+    },
     extras_require={
         "dev": DEV_REQUIRES,
         "test": TEST_REQUIRES,

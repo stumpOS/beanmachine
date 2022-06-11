@@ -1,0 +1,111 @@
+/Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/Applications/CLion.app/Contents/bin/ninja/mac/ninja -G Ninja -DMLIR_DIR=/usr/local/compiler/build_llvm_mlir_py/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=/usr/local/compiler/clang+llvm-14.0.0-x86_64-apple-darwin/bin4/llvm-lit -DCMAKE_C_COMPILER=/usr/local/compiler/clang+llvm-14.0.0-x86_64-apple-darwin/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/compiler/clang+llvm-14.0.0-x86_64-apple-darwin/bin/clang++ -DGCC_INSTALL_PREFIX=/usr/local/compiler/clang+llvm-14.0.0-x86_64-apple-darwin/bin -DPYTHON_EXECUTABLE=/usr/local/Caskroom/miniconda/base/envs/bean-machine-9/bin/python -S /Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir -B /Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir/cmake-build-debug
+-- The CXX compiler identification is Clang 14.0.0
+-- The C compiler identification is Clang 14.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/local/compiler/clang+llvm-14.0.0-x86_64-apple-darwin/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/local/compiler/clang+llvm-14.0.0-x86_64-apple-darwin/bin/clang - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Performing Test Terminfo_LINKABLE
+-- Performing Test Terminfo_LINKABLE - Success
+-- Found Terminfo: /Applications/Xcode_13.3.0_rc1_fb.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.3.sdk/usr/lib/libcurses.tbd  
+-- Found ZLIB: /Applications/Xcode_13.3.0_rc1_fb.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.3.sdk/usr/lib/libz.tbd (found version "1.2.11") 
+-- Found LibXml2: /Applications/Xcode_13.3.0_rc1_fb.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.3.sdk/usr/lib/libxml2.tbd (found version "2.9.4") 
+-- Found PythonInterp: /usr/local/Caskroom/miniconda/base/envs/bean-machine-9/bin/python (found version "3.9.13") 
+-- Found PythonLibs: /usr/local/Caskroom/miniconda/base/envs/bean-machine-9/lib/libpython3.9.dylib
+-- Performing Test HAS_FLTO
+-- Performing Test HAS_FLTO - Success
+-- Performing Test HAS_FLTO_THIN
+-- Performing Test HAS_FLTO_THIN - Success
+-- Found pybind11: /usr/local/Caskroom/miniconda/base/include (found version "2.8.1" )
+-- Using MLIRConfig.cmake in: /usr/local/compiler/build_llvm_mlir_py/lib/cmake/mlir
+-- Using LLVMConfig.cmake in: /Users/stumpos/code/llvmExperiments/llvm-project/build_llvm_mlir_py/lib/cmake/llvm
+-- Using pybind11.cmake in: /usr/local/Caskroom/miniconda/base/share/cmake/pybind11
+-- Linker detection: ld64
+-- Performing Test LLVM_LIBSTDCXX_MIN
+-- Performing Test LLVM_LIBSTDCXX_MIN - Success
+-- Performing Test LLVM_LIBSTDCXX_SOFT_ERROR
+-- Performing Test LLVM_LIBSTDCXX_SOFT_ERROR - Success
+-- Performing Test C_SUPPORTS_FPIC
+-- Performing Test C_SUPPORTS_FPIC - Success
+-- Performing Test CXX_SUPPORTS_FPIC
+-- Performing Test CXX_SUPPORTS_FPIC - Success
+-- Building with -fPIC
+-- Performing Test C_SUPPORTS_FNO_SEMANTIC_INTERPOSITION
+-- Performing Test C_SUPPORTS_FNO_SEMANTIC_INTERPOSITION - Failed
+-- Performing Test CXX_SUPPORTS_FNO_SEMANTIC_INTERPOSITION
+-- Performing Test CXX_SUPPORTS_FNO_SEMANTIC_INTERPOSITION - Failed
+-- Performing Test SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG
+-- Performing Test SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG - Success
+-- Performing Test C_SUPPORTS_WERROR_DATE_TIME
+-- Performing Test C_SUPPORTS_WERROR_DATE_TIME - Success
+-- Performing Test CXX_SUPPORTS_WERROR_DATE_TIME
+-- Performing Test CXX_SUPPORTS_WERROR_DATE_TIME - Success
+-- Performing Test C_SUPPORTS_WERROR_UNGUARDED_AVAILABILITY_NEW
+-- Performing Test C_SUPPORTS_WERROR_UNGUARDED_AVAILABILITY_NEW - Success
+-- Performing Test CXX_SUPPORTS_WERROR_UNGUARDED_AVAILABILITY_NEW
+-- Performing Test CXX_SUPPORTS_WERROR_UNGUARDED_AVAILABILITY_NEW - Success
+-- Performing Test CXX_SUPPORTS_MISSING_FIELD_INITIALIZERS_FLAG
+-- Performing Test CXX_SUPPORTS_MISSING_FIELD_INITIALIZERS_FLAG - Success
+-- Performing Test C_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG
+-- Performing Test C_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG - Success
+-- Performing Test CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG
+-- Performing Test CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG - Success
+-- Performing Test C_SUPPORTS_COVERED_SWITCH_DEFAULT_FLAG
+-- Performing Test C_SUPPORTS_COVERED_SWITCH_DEFAULT_FLAG - Success
+-- Performing Test CXX_SUPPORTS_COVERED_SWITCH_DEFAULT_FLAG
+-- Performing Test CXX_SUPPORTS_COVERED_SWITCH_DEFAULT_FLAG - Success
+-- Performing Test CXX_SUPPORTS_CLASS_MEMACCESS_FLAG
+-- Performing Test CXX_SUPPORTS_CLASS_MEMACCESS_FLAG - Failed
+-- Performing Test CXX_SUPPORTS_NOEXCEPT_TYPE_FLAG
+-- Performing Test CXX_SUPPORTS_NOEXCEPT_TYPE_FLAG - Success
+-- Performing Test CXX_WONT_WARN_ON_FINAL_NONVIRTUALDTOR
+-- Performing Test CXX_WONT_WARN_ON_FINAL_NONVIRTUALDTOR - Success
+-- Performing Test CXX_SUPPORTS_SUGGEST_OVERRIDE_FLAG
+-- Performing Test CXX_SUPPORTS_SUGGEST_OVERRIDE_FLAG - Success
+-- Performing Test CXX_WSUGGEST_OVERRIDE_ALLOWS_ONLY_FINAL
+-- Performing Test CXX_WSUGGEST_OVERRIDE_ALLOWS_ONLY_FINAL - Success
+-- Performing Test C_WCOMMENT_ALLOWS_LINE_WRAP
+-- Performing Test C_WCOMMENT_ALLOWS_LINE_WRAP - Success
+-- Performing Test C_SUPPORTS_STRING_CONVERSION_FLAG
+-- Performing Test C_SUPPORTS_STRING_CONVERSION_FLAG - Success
+-- Performing Test CXX_SUPPORTS_STRING_CONVERSION_FLAG
+-- Performing Test CXX_SUPPORTS_STRING_CONVERSION_FLAG - Success
+-- Performing Test C_SUPPORTS_MISLEADING_INDENTATION_FLAG
+-- Performing Test C_SUPPORTS_MISLEADING_INDENTATION_FLAG - Success
+-- Performing Test CXX_SUPPORTS_MISLEADING_INDENTATION_FLAG
+-- Performing Test CXX_SUPPORTS_MISLEADING_INDENTATION_FLAG - Success
+-- Performing Test LINKER_SUPPORTS_COLOR_DIAGNOSTICS
+-- Performing Test LINKER_SUPPORTS_COLOR_DIAGNOSTICS - Failed
+-- Looking for os_signpost_interval_begin
+-- Looking for os_signpost_interval_begin - found
+-- Performing Test macos_signposts_usable
+-- Performing Test macos_signposts_usable - Success
+-- Found Python3: /usr/local/Caskroom/miniconda/base/bin/python3.9 (found version "3.9.7") found components: Interpreter Development Development.Module Development.Embed 
+-- Found python include dirs: /usr/local/Caskroom/miniconda/base/include/python3.9
+-- Found python libraries: /usr/local/Caskroom/miniconda/base/lib/libpython3.9.dylib
+-- Found Python3: /usr/local/Caskroom/miniconda/base/bin/python3.9 (found suitable version "3.9.7", minimum required is "3.0") found components: Interpreter Development.Module NumPy 
+-- Found python include dirs: /usr/local/Caskroom/miniconda/base/include/python3.9
+-- Found python libraries: /usr/local/Caskroom/miniconda/base/lib/libpython3.9.dylib
+-- Found numpy v1.22.1: /usr/local/Caskroom/miniconda/base/lib/python3.9/site-packages/numpy/core/include
+-- Using explicit pybind11 cmake directory: /usr/local/Caskroom/miniconda/base/share/cmake/pybind11 (-Dpybind11_DIR to change)
+-- Found pybind11 v2.8.1: /usr/local/Caskroom/miniconda/base/include
+-- Python prefix = '', suffix = '', extension = '.cpython-39-darwin.so
+-- Using explicit pybind11 cmake directory: /usr/local/Caskroom/miniconda/base/share/cmake/pybind11 (-Dpybind11_DIR to change)
+-- dialect_libs: MLIRAffineAnalysis;MLIRAffine;MLIRAffineTransforms;MLIRAffineUtils;MLIRAMDGPU;MLIRArithmetic;MLIRArithmeticTransforms;MLIRArithmeticUtils;MLIRArmNeon;MLIRArmSVE;MLIRArmSVETransforms;MLIRAsync;MLIRAsyncTransforms;MLIRAMX;MLIRAMXTransforms;MLIRBufferization;MLIRBufferizationTransforms;MLIRComplex;MLIRControlFlow;MLIRDLTI;MLIREmitC;MLIRFunc;MLIRFuncTransforms;MLIRGPUOps;MLIRGPUTransforms;MLIRLinalgAnalysis;MLIRLinalg;MLIRLinalgTransformOps;MLIRLinalgTransforms;MLIRLinalgUtils;MLIRLLVMIRTransforms;MLIRLLVMIR;MLIRNVVMIR;MLIRROCDLIR;MLIRMath;MLIRMathTransforms;MLIRMemRef;MLIRMemRefTransforms;MLIRMemRefUtils;MLIRMLProgram;MLIRNVGPU;MLIROpenACC;MLIROpenMP;MLIRPDL;MLIRPDLInterp;MLIRQuant;MLIRQuantTransforms;MLIRQuantUtils;MLIRSCF;MLIRSCFTransforms;MLIRSCFUtils;MLIRShape;MLIRShapeOpsTransforms;MLIRSparseTensor;MLIRSparseTensorTransforms;MLIRSparseTensorPipelines;MLIRSparseTensorUtils;MLIRSPIRV;MLIRSPIRVModuleCombiner;MLIRSPIRVConversion;MLIRSPIRVTransforms;MLIRSPIRVUtils;MLIRTensor;MLIRTensorInferTypeOpInterfaceImpl;MLIRTensorTilingInterfaceImpl;MLIRTensorTransforms;MLIRTensorUtils;MLIRTosa;MLIRTosaTransforms;MLIRTransformDialect;MLIRVector;MLIRVectorTransforms;MLIRVectorUtils;MLIRX86Vector;MLIRX86VectorTransforms;MLIRTosaTestPasses
+-- conversion_libs: MLIRAffineToStandard;MLIRAMDGPUToROCDL;MLIRArithmeticToLLVM;MLIRArithmeticToSPIRV;MLIRArmNeon2dToIntr;MLIRAsyncToLLVM;MLIRBufferizationToMemRef;MLIRComplexToLLVM;MLIRComplexToLibm;MLIRComplexToStandard;MLIRControlFlowToLLVM;MLIRControlFlowToSPIRV;MLIRFuncToLLVM;MLIRFuncToSPIRV;MLIRGPUToGPURuntimeTransforms;MLIRGPUToNVVMTransforms;MLIRGPUToROCDLTransforms;MLIRGPUToSPIRV;MLIRGPUToVulkanTransforms;MLIRLinalgToLLVM;MLIRLinalgToSPIRV;MLIRLinalgToStandard;MLIRLLVMCommonConversion;MLIRMathToLibm;MLIRMathToLLVM;MLIRMathToSPIRV;MLIRMemRefToLLVM;MLIRMemRefToSPIRV;MLIRNVGPUToNVVM;MLIROpenACCToLLVM;MLIROpenACCToSCF;MLIROpenMPToLLVM;MLIRPDLToPDLInterp;MLIRReconcileUnrealizedCasts;MLIRSCFToControlFlow;MLIRSCFToGPU;MLIRSCFToOpenMP;MLIRSCFToSPIRV;MLIRShapeToStandard;MLIRSPIRVToLLVM;MLIRTensorToLinalg;MLIRTensorToSPIRV;MLIRTosaToArith;MLIRTosaToLinalg;MLIRTosaToSCF;MLIRTosaToTensor;MLIRVectorToROCDL;MLIRVectorToLLVM;MLIRVectorToGPU;MLIRVectorToSCF;MLIRVectorToSPIRV
+-- Configuring done
+-- Generating done
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    GCC_INSTALL_PREFIX
+    LLVM_EXTERNAL_LIT
+
+
+-- Build files have been written to: /Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir/cmake-build-debug

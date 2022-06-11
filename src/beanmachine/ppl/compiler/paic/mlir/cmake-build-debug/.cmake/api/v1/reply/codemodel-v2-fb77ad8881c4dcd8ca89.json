@@ -1,0 +1,232 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-1375ad0adcf9bf5653a6.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.22"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12
+					]
+				},
+				{
+					"build" : "include",
+					"jsonFile" : "directory-include-Debug-7ead17b99bffc88b66bb.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.22"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "include",
+					"targetIndexes" : 
+					[
+						3,
+						13,
+						14
+					]
+				},
+				{
+					"build" : "src",
+					"jsonFile" : "directory-src-Debug-b6cf2213fc5053b67c22.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.22"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "src"
+				},
+				{
+					"build" : "python",
+					"jsonFile" : "directory-python-Debug-8db83237229819026e8d.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.22"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "python"
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3
+					],
+					"name" : "PAIC_IR",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "PAIC_IR::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PAIC_IR-Debug-1ec27f0d13c275734615.json",
+					"name" : "PAIC_IR",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PPL::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PPL-Debug-2791c177274183f7d0be.json",
+					"name" : "PPL",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "acc_gen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-acc_gen-Debug-1d0e628d411ece9ede15.json",
+					"name" : "acc_gen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "demo_dialect::@14b3099d61bfdbeae804",
+					"jsonFile" : "target-demo_dialect-Debug-1802513579b13458e554.json",
+					"name" : "demo_dialect",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "install-PAIC_IR::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-install-PAIC_IR-Debug-9bc78341fa0689ef7421.json",
+					"name" : "install-PAIC_IR",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "install-PAIC_IR-stripped::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-install-PAIC_IR-stripped-Debug-d7334486365e6a88edef.json",
+					"name" : "install-PAIC_IR-stripped",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "intrinsics_gen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-intrinsics_gen-Debug-47881a83da8ee697a203.json",
+					"name" : "intrinsics_gen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "mlir-doc::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-mlir-doc-Debug-4556d43a50688f85fe50.json",
+					"name" : "mlir-doc",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "mlir-generic-headers::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-mlir-generic-headers-Debug-8e3cf664b116fafa7f0f.json",
+					"name" : "mlir-generic-headers",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "mlir-headers::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-mlir-headers-Debug-16260e31a2440e8056c7.json",
+					"name" : "mlir-headers",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "mlir-tablegen-targets::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-mlir-tablegen-targets-Debug-e3f3966b409fddd11a45.json",
+					"name" : "mlir-tablegen-targets",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "omp_gen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-omp_gen-Debug-cf2938e1ed30ab22791b.json",
+					"name" : "omp_gen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "paic_mlir::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-paic_mlir-Debug-74b3f719e5dbc8077022.json",
+					"name" : "paic_mlir",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "shape_infer::@14b3099d61bfdbeae804",
+					"jsonFile" : "target-shape_infer-Debug-c5ed4be69a0eb490f277.json",
+					"name" : "shape_infer",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "toy_combine::@14b3099d61bfdbeae804",
+					"jsonFile" : "target-toy_combine-Debug-2a60546e9d6a3b6bfb26.json",
+					"name" : "toy_combine",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir/cmake-build-debug",
+		"source" : "/Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}
