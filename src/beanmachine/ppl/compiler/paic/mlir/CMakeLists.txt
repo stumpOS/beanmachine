@@ -32,11 +32,6 @@ message(STATUS "Found python libraries: ${Python3_LIBRARIES}")
 mlir_configure_python_dev_packages()
 mlir_detect_pybind11_install()
 
-# delete maybe?
-#add_definitions(-DPYBIND)
-#find_package(PythonLibs)
-#include_directories(${PYTHON_INCLUDE_DIRS})
-
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${pybind11_INCLUDE_DIRS})
@@ -96,18 +91,3 @@ target_link_libraries(paic_mlir PRIVATE PAIC_IR)
 # define (VERSION_INFO) here.
 target_compile_definitions(paic_mlir
         PRIVATE VERSION_INFO=${EXAMPLE_VERSION_INFO})
-
-# test paic_mlir
-#add_library(paic_mlir_lib include/MLIRBuilder.h python/MLIRBuilder.cpp)
-#target_link_libraries(paic_mlir_lib PRIVATE PAIC_IR)
-#
-#add_llvm_executable(PAIC_MLIR_TEST test_paic_mlir/main.cpp)
-#target_link_libraries(PAIC_MLIR_TEST paic_mlir_lib)
-#target_compile_options(PAIC_MLIR_TEST PUBLIC -fexceptions -frtti)
-
-# I think this is only necessary if you are creating a 'mlir_python_module' or a 'mlir_capi'
-# declares pure python sources as part of a named grouping that can be built later
-#declare_mlir_python_sources(PAIC_MLIR_PythonSources
-#        ROOT_DIR "${PROJECT_SOURCE_DIR}"
-#        SOURCES_GLOB *.py
-#        )
