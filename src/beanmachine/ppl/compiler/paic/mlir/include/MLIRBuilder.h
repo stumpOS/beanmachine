@@ -7,12 +7,14 @@
 
 #include <pybind11/pybind11.h>
 #include "mlir-c/IR.h"
+#include "PaicAST.h"
 
 namespace paic_mlir {
     class MLIRBuilder {
     public:
         static void bind(pybind11::module &m);
         MLIRBuilder(pybind11::object contextObj);
+        pybind11::object to_metal(std::shared_ptr<paic_mlir::PythonFunction> function);
     };
 }
 

@@ -83,7 +83,8 @@ add_llvm_executable(PPL test/main.cpp)
 target_link_libraries(PPL PRIVATE PAIC_IR)
 
 # pybind module
-pybind11_add_module(paic_mlir python/MLIRBuilder.cpp)
+set(CMAKE_CXX_FLAGS "-g -O0")
+pybind11_add_module(paic_mlir python/MLIRBuilder.cpp python/PaicAST.cpp)
 target_include_directories(paic_mlir PUBLIC include)
 target_link_libraries(paic_mlir PRIVATE PAIC_IR)
 
