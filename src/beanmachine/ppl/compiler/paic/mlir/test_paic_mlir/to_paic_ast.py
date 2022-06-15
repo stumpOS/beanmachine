@@ -39,10 +39,11 @@ class paic_ast_generator:
         call_node = paic_mlir.CallNode(paic_mlir.Location(0,0), "times", expList,paic_mlir.Type("float"))
         var_node = paic_mlir.VarNode(paic_mlir.Location(0,0), "i0",paic_mlir.Type("float"), call_node)
         ret_node = paic_mlir.ReturnNode(paic_mlir.Location(0,0), paic_mlir.GetValNode(paic_mlir.Location(0,0), "i0", paic_mlir.Type("float")))
-        node_list.push_back(var_node);
-        node_list.push_back(ret_node);
+        node_list.push_back(var_node)
+        node_list.push_back(ret_node)
         body = paic_mlir.make_block_ptr(paic_mlir.Location(0,0),node_list)
-        python_function = paic_mlir.PythonFunction(paic_mlir.Location(0,0), function_def.name,paic_mlir.Type("float"), param_list, body)
+        fnc_name = function_def.name
+        python_function = paic_mlir.PythonFunction(paic_mlir.Location(0,0), "bar", paic_mlir.Type("float"), param_list, body)
         return python_function
         # function_signature = llvmlite.ir.FunctionType(ir_return_type, ir_param_types)
         # func = llvmlite.ir.Function(module, function_signature, name=function_def.name)

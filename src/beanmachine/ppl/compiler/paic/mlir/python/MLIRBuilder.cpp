@@ -189,40 +189,18 @@ namespace {
 
         mlir::Value mlirGen(paic_mlir::ConstNode<float>* expr) {
             auto type = getType(expr->getType());
-            builder.create<mlir::arith::ConstantFloatOp>(loc(expr->loc()), llvm::APFloat(expr->getValue()), mlir::FloatType());
-
-//            // The attribute is a vector with a floating point value per element
-//            // (number) in the array, see `collectData()` below for more details.
-//            std::vector<double> data;
-//            data.reserve(std::accumulate(lit.getDims().begin(), lit.getDims().end(), 1,
-//                                         std::multiplies<int>()));
-//            collectData(lit, data);
-//
-//            // The type of this attribute is tensor of 64-bit floating-point with the
-//            // shape of the literal.
-//            mlir::Type elementType = builder.getF64Type();
-//            auto dataType = mlir::RankedTensorType::get(lit.getDims(), elementType);
-//
-//            // This is the actual attribute that holds the list of values for this
-//            // tensor literal.
-//            auto dataAttribute =
-//                    mlir::DenseElementsAttr::get(dataType, llvm::makeArrayRef(data));
-//
-//            // Build the MLIR op `toy.constant`. This invokes the `ConstantOp::build`
-//            // method.
-//            return builder.create<llvm::mlir::LLVM_ConstantOp>(loc(lit.loc()), type, dataAttribute);
-            throw 0;
+            return builder.create<mlir::arith::ConstantFloatOp>(loc(expr->loc()), llvm::APFloat(expr->getValue()), mlir::FloatType());
         }
 
         mlir::Value mlirGen(paic_mlir::Expression* expr) {
             switch (expr->getKind()) {
                 case paic_mlir::NodeKind::GetVal:
-                    return mlirGen(*cast<paic_mlir::GetValNode*>(expr));
+                    return mlirGen(dynamic_cast<paic_mlir::GetValNode*>(expr));
                 case paic_mlir::NodeKind::Constant:
                     // TODO: cast to ConstNode parent and query primitive type
-                    return mlirGen(*cast<paic_mlir::ConstNode<float>*>(expr));
+                    return mlirGen(dynamic_cast<paic_mlir::ConstNode<float>*>(expr));
                 case paic_mlir::NodeKind::Call:
-                    return mlirGen(*cast<paic_mlir::CallNode*>(expr));
+                    return mlirGen(dynamic_cast<paic_mlir::CallNode*>(expr));
                 default:
                     emitError(loc(expr->loc()))
                             << "MLIR codegen encountered an unhandled expr kind '"
