@@ -321,7 +321,7 @@ namespace {
     };
 }
 
-pybind11::object paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::PythonFunction> function) {
+pybind11::float_ paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::PythonFunction> function) {
     // TODO: if not already compiled, compile the Python function by
     //      mapping to mlir and compiling. Call compiled function and return results.
     // TODO: accept the functions relevant to the input model. Generate implementation of the ModelWorld
@@ -374,7 +374,7 @@ pybind11::object paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::Pyt
         llvm::errs() << "JIT invocation failed\n";
         throw 0;
     }
-    throw 0;
+    return pybind11::float_(res);
 }
 
 // TODO:

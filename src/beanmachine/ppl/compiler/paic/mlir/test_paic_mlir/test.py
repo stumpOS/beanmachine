@@ -52,3 +52,4 @@ if __name__ == "__main__":
     model = NormalNormal()
     call = foo_infer(queries=[model.mu()],
                      observations={model.x(1): torch.tensor(9.0),model.x(2): torch.tensor(10.0)})
+    print("mlir returned " + str(call))

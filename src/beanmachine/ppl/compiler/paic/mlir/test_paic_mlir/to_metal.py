@@ -10,7 +10,8 @@ mb = MLIRBuilder()
 
 # takes a callable and returns an ast
 def to_metal(callable:Callable):
-    def wrapper():
+    # should return callable
+    def wrapper(*args, **kwargs):
         lines, _ = inspect.getsourcelines(callable)
         source = "".join(_unindent(lines))
         module = ast.parse(source)
@@ -19,5 +20,6 @@ def to_metal(callable:Callable):
         to_paic = paic_ast_generator()
         python_function = to_paic.python_ast_to_paic_ast(funcdef)
         # TODO: pass the paic ast to the import function instead
-        return mb.to_metal(python_function)
-    return wrapper()
+        result = mb.to_metal(python_function)
+        return result
+    return wrapper
