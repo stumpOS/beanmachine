@@ -8,6 +8,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.o
 
 # Distribution / packaging
 .Python
@@ -120,3 +121,6 @@ website/static/js/*
 !website/static/js/code_block_buttons.js
 website/static/_sphinx-sources/
 docs/api/
+
+# cmake
+cmake-build-debug/
