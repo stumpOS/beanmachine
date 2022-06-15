@@ -123,4 +123,4 @@ website/static/_sphinx-sources/
 docs/api/
 
 # cmake
-cmake-build-debug/
+**/cmake-build-debug
