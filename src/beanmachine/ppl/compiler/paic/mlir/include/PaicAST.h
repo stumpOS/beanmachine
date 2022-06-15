@@ -141,7 +141,7 @@ namespace paic_mlir {
     public:
         PythonFunction(Location location, const std::string &name, Type retType,
                 std::vector<std::shared_ptr<ParamNode>> args,
-        std::shared_ptr<BlockNode> body):Node(std::move(location), Function), _retType(std::move(retType)), _body(body),_args(args) {}
+        std::shared_ptr<BlockNode> body):Node(std::move(location), Function), _retType(std::move(retType)), _body(body),_args(args), _name(name) {}
         llvm::StringRef getName() const { return _name; }
         llvm::ArrayRef<std::shared_ptr<ParamNode>> getArgs() { return _args; }
         std::shared_ptr<BlockNode> getBody() { return _body; }

@@ -4,10 +4,21 @@
 #include <iostream>
 
 #include "MLIRBuilder.h"
-#include "ToyDialect.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/ExecutionEngine/ExecutionEngine.h"
+#include "mlir/ExecutionEngine/OptUtils.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Export.h"
+#include "mlir/Transforms/Passes.h"
+#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
+#include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
 
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -16,11 +27,19 @@
 #include "mlir/IR/Verifier.h"
 
 #include "llvm/ADT/ScopedHashTable.h"
-
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/IR/Module.h"
+
 #include <numeric>
+#include <string>
 
 using llvm::ArrayRef;
 using llvm::cast;
@@ -263,8 +282,10 @@ namespace {
             mlir::TypeRange inputs(llvm::makeArrayRef(arg_types));
             mlir::FunctionType funcType = builder.getFunctionType(inputs, getType(pythonFunction->getType()));
             // TODO: add attributes here if relevant
+            //mlir::Attr
+           // attribute array looks like this: ::llvm::ArrayRef<::mlir::NamedAttribute>{emit_llvm_attr})
             mlir::func::FuncOp func_op = builder.create<mlir::func::FuncOp>(location, pythonFunction->getName(), funcType);
-
+            func_op->setAttr("llvm.emit_c_interface", mlir::UnitAttr::get(func_op->getContext()));
             func_op.addEntryBlock();
             mlir::Block &entryBlock = func_op.front();
             auto protoArgs = pythonFunction->getArgs();
@@ -310,7 +331,6 @@ pybind11::object paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::Pyt
 
     // MLIR context (load any custom dialects you want to use)
     ::mlir::MLIRContext *context = new ::mlir::MLIRContext();
-    context->loadDialect<mlir::toy::ToyDialect>();
     context->loadDialect<mlir::func::FuncDialect>();
     context->loadDialect<mlir::math::MathDialect>();
     context->loadDialect<mlir::arith::ArithmeticDialect>();
@@ -321,8 +341,39 @@ pybind11::object paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::Pyt
     std::shared_ptr<PythonModule> py_module = std::make_shared<PythonModule>(functions);
     MLIRGenImpl generator(*context);
     auto mlir_module = generator.generate_op(py_module);
+    mlir_module->dump();
 
+    // todo: add passes and run module
+    mlir::PassManager pm(context);
+    pm.addPass(mlir::createConvertFuncToLLVMPass());
+    pm.addPass(mlir::arith::createConvertArithmeticToLLVMPass());
+    auto result = pm.run(mlir_module);
 
+    // Lower to machine code
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    mlir::registerLLVMDialectTranslation(*context);
+
+    // An optimization pipeline to use within the execution engine.
+    auto optPipeline = mlir::makeOptimizingTransformer(
+            /*optLevel=*/3, /*sizeLevel=*/0,
+            /*targetMachine=*/nullptr);
+
+    // Create an MLIR execution engine. The execution engine eagerly JIT-compiles
+    // the module.
+    mlir::ExecutionEngineOptions engineOptions;
+    engineOptions.transformer = optPipeline;
+    auto maybeEngine = mlir::ExecutionEngine::create(mlir_module, engineOptions);
+    assert(maybeEngine && "failed to construct an execution engine");
+    auto &engine = maybeEngine.get();
+
+    // Invoke the JIT-compiled function.
+    float res = 0;
+    auto invocationResult = engine->invoke(function->getName(), 4.0f, mlir::ExecutionEngine::result(res));
+    if (invocationResult) {
+        llvm::errs() << "JIT invocation failed\n";
+        throw 0;
+    }
     throw 0;
 }
 
