@@ -124,3 +124,4 @@ docs/api/
 
 # cmake
 **/cmake-build-debug
+**/cmake-build-debug/**

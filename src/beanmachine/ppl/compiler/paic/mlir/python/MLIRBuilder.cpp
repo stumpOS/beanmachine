@@ -198,15 +198,13 @@ namespace {
             // arguments: FuncOp callee, ValueRange operands = {}
             if (mlir::func::FuncOp functionOp = functionSymbolTable.lookup(callee)){
                 auto call = builder.create<mlir::func::CallOp>(location, functionOp, operands);
-                throw 0;
                 // TODO: discover correct abstraction for values
-             //   return call;
+                emitError(location, "User defined functions not supported yet");
+                return nullptr;
             } else {
-                emitError(location, "MLIR codegen encountered an error: toy.transpose "
-                                    "does not accept multiple arguments");
+                emitError(location, "Unreconized function :" + callee);
                 return nullptr;
             }
-
         }
 
         mlir::Value mlirGen(paic_mlir::ConstNode<float>* expr) {
