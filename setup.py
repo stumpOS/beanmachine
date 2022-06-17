@@ -157,9 +157,15 @@ class CMakeBuild(build_py):
         if os.path.exists(target_dir):
             shutil.rmtree(target_dir, ignore_errors=False, onerror=None)
 
+        # copying from /Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir/cmake-build-debug into build/lib.macosx-10.9-x86_64-cpython-39
+        # we really want to copy it into src
+        print("copying from " + python_package_dir + " into " + target_dir)
         shutil.copytree(python_package_dir,
                         target_dir,
                         symlinks=False)
+        file = "/Users/stumpos/code/bm_new/beanmachine/src/beanmachine/ppl/compiler/paic/mlir/cmake-build-debug/paic_mlir.cpython-39-darwin.so"
+        print("copying from " + file + " into " + target_dir)
+        shutil.copyfile(file, "src/beanmachine/paic_mlir.cpython-39-darwin.so")
 
 
 class CMakeExtension(Extension):

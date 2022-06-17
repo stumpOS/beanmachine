@@ -2,8 +2,9 @@ import inspect
 import ast
 
 from paic_mlir import MLIRBuilder
-from to_paic_ast import paic_ast_generator
-from utils import _unindent
+
+from beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.to_paic_ast import paic_ast_generator
+from beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.utils import _unindent
 from typing import Callable
 
 mb = MLIRBuilder()
@@ -20,6 +21,8 @@ def to_metal(callable:Callable):
         to_paic = paic_ast_generator()
         python_function = to_paic.python_ast_to_paic_ast(funcdef)
         # TODO: pass the paic ast to the import function instead
-        result = mb.to_metal(python_function)
+        arg = float(args[0])
+        result = mb.to_metal(python_function, arg)
+        print(result)
         return result
     return wrapper

@@ -46,14 +46,16 @@ void paic_mlir::Node::bind(pybind11::module &m) {
             .def(py::init<Location, NodeKind>())
             .def("loc", &Node::loc);
     py::class_<Expression, std::shared_ptr<Expression>, Node>(m, "Expression")
-            .def(py::init<Location,NodeKind,Type>());
+            .def(py::init<Location,NodeKind,Type>()).def("type", &paic_mlir::Expression::getType);
     py::class_<ConstNode<float>, std::shared_ptr<ConstNode<float>>, Expression>(m, "FloatNode").def(py::init<Location, float>());
 
     py::class_<DeclareValNode, std::shared_ptr<DeclareValNode>, Node>(m, "DeclareValNode")
-            .def(py::init<Location,std::string, NodeKind, Type>());
+            .def(py::init<Location,std::string, NodeKind, Type>())
+            .def("type", &paic_mlir::DeclareValNode::getType)
+            .def("name", &paic_mlir::DeclareValNode::getPyName);
 
     py::class_<ParamNode, std::shared_ptr<ParamNode>, DeclareValNode>(m, "ParamNode")
-            .def(py::init<Location,std::string, Type>());
+            .def(py::init<Location,std::string, Type>()).def("name", &paic_mlir::DeclareValNode::getPyName).def("type", &paic_mlir::DeclareValNode::getType);
 
     py::class_<CallNode, std::shared_ptr<CallNode>, Expression>(m, "CallNode")
             .def(py::init<Location,const std::string &,std::vector<std::shared_ptr<Expression>>,Type>());

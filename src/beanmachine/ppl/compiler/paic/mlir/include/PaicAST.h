@@ -56,7 +56,8 @@ namespace paic_mlir {
     class DeclareValNode : public Node {
     public:
         DeclareValNode(Location loc, llvm::StringRef name, NodeKind kind, Type type):Node(std::move(loc), kind), _name(name),_type(std::move(type)){}
-        llvm::StringRef getName() { return _name; }
+        std::string getPyName() { return _name; }
+        llvm::StringRef getName() const { return _name; }
         const Type &getType() { return _type; }
     private:
         std::string _name;
@@ -91,7 +92,9 @@ namespace paic_mlir {
     public:
         GetValNode(Location loc, llvm::StringRef name, Type type)
                 : Expression(std::move(loc), NodeKind::GetVal, std::move(type)), _name(name) {}
-        llvm::StringRef getName() { return _name; }
+
+        std::string getPyName() { return _name; }
+        llvm::StringRef getName() const { return _name; }
     private:
         std::string _name;
     };
@@ -142,6 +145,7 @@ namespace paic_mlir {
         PythonFunction(Location location, const std::string &name, Type retType,
                 std::vector<std::shared_ptr<ParamNode>> args,
         std::shared_ptr<BlockNode> body):Node(std::move(location), Function), _retType(std::move(retType)), _body(body),_args(args), _name(name) {}
+        std::string getPyName() const { return _name; }
         llvm::StringRef getName() const { return _name; }
         llvm::ArrayRef<std::shared_ptr<ParamNode>> getArgs() { return _args; }
         std::shared_ptr<BlockNode> getBody() { return _body; }

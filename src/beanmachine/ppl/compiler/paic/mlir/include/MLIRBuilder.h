@@ -14,7 +14,7 @@ namespace paic_mlir {
     public:
         static void bind(pybind11::module &m);
         MLIRBuilder(pybind11::object contextObj);
-        pybind11::float_ to_metal(std::shared_ptr<paic_mlir::PythonFunction> function);
+        pybind11::float_ to_metal(std::shared_ptr<paic_mlir::PythonFunction> function, pybind11::float_ input);
     };
 }
 

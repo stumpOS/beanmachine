@@ -17,6 +17,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
@@ -99,8 +100,8 @@ namespace {
     private:
         mlir::ModuleOp theModule;
         mlir::OpBuilder builder;
-        llvm::ScopedHashTable<StringRef, mlir::Value> symbolTable;
-        llvm::ScopedHashTable<StringRef, mlir::func::FuncOp> functionSymbolTable;
+        llvm::ScopedHashTable<llvm::StringRef, mlir::Value> symbolTable;
+        llvm::ScopedHashTable<llvm::StringRef, mlir::func::FuncOp> functionSymbolTable;
 
         mlir::Location loc(const paic_mlir::Location &loc) {
             return mlir::FileLineColLoc::get(builder.getStringAttr("file_not_implemented_yet"), loc.getLine(),
@@ -187,6 +188,8 @@ namespace {
                 }
 
                 return builder.create<mlir::arith::MulFOp>(location, operands[0], operands[1]);
+            } else if (callee == "math.pow") {
+                return builder.create<mlir::math::PowFOp>(location, operands[0], operands[1]);
             }
 
             // Otherwise this is a call to a user-defined function. Calls to
@@ -207,8 +210,8 @@ namespace {
         }
 
         mlir::Value mlirGen(paic_mlir::ConstNode<float>* expr) {
-            auto type = getType(expr->getType());
-            return builder.create<mlir::arith::ConstantFloatOp>(loc(expr->loc()), llvm::APFloat(expr->getValue()), mlir::FloatType());
+            //auto type = getType(expr->getType());
+            return builder.create<mlir::arith::ConstantFloatOp>(loc(expr->loc()), llvm::APFloat(expr->getValue()), builder.getF32Type());
         }
 
         mlir::Value mlirGen(paic_mlir::Expression* expr) {
@@ -321,14 +324,7 @@ namespace {
     };
 }
 
-pybind11::float_ paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::PythonFunction> function) {
-    // TODO: if not already compiled, compile the Python function by
-    //      mapping to mlir and compiling. Call compiled function and return results.
-    // TODO: accept the functions relevant to the input model. Generate implementation of the ModelWorld
-
-    std::cout << function->getName().data();
-    // from the Python function, create MLIR
-
+pybind11::float_ paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::PythonFunction> function, pybind11::float_ input) {
     // MLIR context (load any custom dialects you want to use)
     ::mlir::MLIRContext *context = new ::mlir::MLIRContext();
     context->loadDialect<mlir::func::FuncDialect>();
@@ -346,6 +342,7 @@ pybind11::float_ paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::Pyt
     // todo: add passes and run module
     mlir::PassManager pm(context);
     pm.addPass(mlir::createConvertFuncToLLVMPass());
+    pm.addPass(mlir::createConvertMathToLLVMPass());
     pm.addPass(mlir::arith::createConvertArithmeticToLLVMPass());
     auto result = pm.run(mlir_module);
 
@@ -369,12 +366,10 @@ pybind11::float_ paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::Pyt
 
     // Invoke the JIT-compiled function.
     float res = 0;
-    auto invocationResult = engine->invoke(function->getName(), 4.0f, mlir::ExecutionEngine::result(res));
+    auto invocationResult = engine->invoke(function->getName(), input.operator float(), mlir::ExecutionEngine::result(res));
     if (invocationResult) {
         llvm::errs() << "JIT invocation failed\n";
         throw 0;
     }
     return pybind11::float_(res);
 }
-
-// TODO:
