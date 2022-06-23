@@ -1,22 +1,23 @@
 import _ast
 import ast
+import inspect
 
 import paic_mlir
 import typing
 
 import beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.utils
+import beanmachine.ppl.compiler.runtime
 
 
 class MLIRCompileError(Exception):
-    def __init__(self, message: str):
-        self.__cause__ = message
+    pass
 
 class paic_ast_generator:
     def __init__(self):
         self.floatType = paic_mlir.Type("float")
         self.type_map = {'float': self.floatType }
 
-    def python_ast_to_paic_ast(self, function_def: _ast.FunctionDef) -> paic_mlir.PythonFunction:
+    def python_ast_to_paic_ast(self, function_def: _ast.FunctionDef, globals:typing.Dict) -> paic_mlir.PythonFunction:
         param_list = paic_mlir.ParamList()
         symbols: typing.Dict[str, paic_mlir.DeclareValNode] = {}
 
@@ -70,12 +71,21 @@ class paic_ast_generator:
                             node = paic_mlir.FloatNode(paic_mlir.Location(0, 0), a.value)
                             expList.push_back(node)
                     fnc_name = beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.utils.to_name(python_rhs.func)
-                    call_node = paic_mlir.CallNode(paic_mlir.Location(0, 0), fnc_name, expList, self.floatType)
-                    var_node = paic_mlir.VarNode(paic_mlir.Location(0, 0), result_name, call_node.type(), call_node)
-                    node_list.push_back(var_node)
-                    symbols[result_name] = var_node
+                    if globals.__contains__(fnc_name):
+                        value = globals[fnc_name]
+                        if isinstance(value, typing.Callable):
+                            alias = value.__str__()
+                            if isinstance(value, beanmachine.ppl.compiler.runtime.builtin_function_or_method):
+                                raise MLIRCompileError("Aliasing a built in method is not supported: " + alias)
+                            lines, _ = inspect.getsourcelines(value)
+                            source = "".join(beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.utils._unindent(lines))
+                            module = ast.parse(source)
+                            funcdef:_ast.FunctionDef = module.body[0]
+                            globals[fnc_name] = funcdef.name
+                        elif isinstance(value, str):
+                            fnc_name = value
+
                 elif isinstance(python_rhs, _ast.BinOp):
-                    op = python_rhs.op
                     if not symbols.__contains__(python_rhs.left.id):
                         raise MLIRCompileError("only local variables are referencable")
                     if not symbols.__contains__(python_rhs.right.id):
@@ -83,23 +93,21 @@ class paic_ast_generator:
 
                     left = symbols[python_rhs.left.id]
                     right = symbols[python_rhs.right.id]
-
-                    left_node = paic_mlir.GetValNode(paic_mlir.Location(0, 0), left.name(), left.type())
-                    right_node = paic_mlir.GetValNode(paic_mlir.Location(0, 0), right.name(), right.type())
-                    expList.push_back(left_node)
-                    expList.push_back(right_node)
+                    expList.push_back(paic_mlir.GetValNode(paic_mlir.Location(0, 0), left.name(), left.type()))
+                    expList.push_back(paic_mlir.GetValNode(paic_mlir.Location(0, 0), right.name(), right.type()))
 
                     # TODO: nesting should be supported
                     if not isinstance(python_rhs.right, _ast.Name) or not isinstance(python_rhs.left, _ast.Name):
                         raise MLIRCompileError("no nesting allowed. Problem: " + python_target.id)
-                    if isinstance(op, _ast.Mult):
+                    if isinstance(python_rhs.op, _ast.Mult):
                         # TODO: how to infer return type?
-                        call_node = paic_mlir.CallNode(paic_mlir.Location(0,0), "times", expList, self.floatType)
+                        fnc_name = "times"
                     else:
                         raise MLIRCompileError("I only compile multiplication for now")
-                    var_node = paic_mlir.VarNode(paic_mlir.Location(0, 0), result_name, call_node.type(), call_node)
-                    node_list.push_back(var_node)
-                    symbols[result_name] = var_node
+                call_node = paic_mlir.CallNode(paic_mlir.Location(0, 0), fnc_name, expList, self.floatType)
+                var_node = paic_mlir.VarNode(paic_mlir.Location(0, 0), result_name, call_node.type(), call_node)
+                node_list.push_back(var_node)
+                symbols[result_name] = var_node
             elif isinstance(python_node, _ast.Return):
                 if not isinstance(python_node.value, _ast.Name):
                     raise MLIRCompileError("no nesting allowed. Problem is return statement in " + function_def.name)
