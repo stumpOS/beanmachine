@@ -41,8 +41,8 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 # library
-add_llvm_library(PAIC_IR src/ToyDialect.cpp src/MLIRGenerator.cpp src/AST.cpp src/ToyCombine.cpp src/ShapeInferencePass.cpp src/LowerToAffineLoops.cpp src/LowerToLLVM.cpp)
-add_dependencies(PAIC_IR demo_dialect toy_combine shape_infer)
+add_llvm_library(PAIC_IR src/ToyDialect.cpp src/MLIRGenerator.cpp src/AST.cpp src/ToyCombine.cpp src/ShapeInferencePass.cpp src/LowerToAffineLoops.cpp src/LowerToLLVM.cpp src/bm/dialect.cpp)
+add_dependencies(PAIC_IR demo_dialect toy_combine shape_infer bm_dialect)
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 message(STATUS "dialect_libs: ${dialect_libs}")
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
@@ -84,7 +84,7 @@ target_link_libraries(PPL PRIVATE PAIC_IR)
 
 # pybind module
 set(CMAKE_CXX_FLAGS "-g -O0")
-pybind11_add_module(paic_mlir python/MLIRBuilder.cpp python/PaicAST.cpp)
+pybind11_add_module(paic_mlir python/MLIRBuilder.cpp python/PaicAST.cpp python/WorldTypeBuilder.cpp)
 target_include_directories(paic_mlir PUBLIC include)
 target_link_libraries(paic_mlir PRIVATE PAIC_IR)
 

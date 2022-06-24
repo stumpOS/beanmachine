@@ -4,7 +4,7 @@
 
 #include "PaicAST.h"
 #include <pybind11/stl.h>
-
+#include "pybind_utils.h"
 namespace py = pybind11;
 
 PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
@@ -16,21 +16,6 @@ using ParamList = std::vector<std::shared_ptr<paic_mlir::ParamNode>, std::alloca
 PYBIND11_MAKE_OPAQUE(ParamList);
 using FunctionList = std::vector<std::shared_ptr<paic_mlir::PythonFunction>, std::allocator<std::shared_ptr<paic_mlir::PythonFunction>>>;
 PYBIND11_MAKE_OPAQUE(FunctionList);
-
-template<typename T>
-void bind_vector(pybind11::module &m, const char* name){
-    py::class_<std::vector<T, std::allocator<T>>>(m, name)
-            .def(py::init<>())
-            .def("pop_back", &std::vector<T>::pop_back)
-                    /* There are multiple versions of push_back(), etc. Select the right ones. */
-            .def("push_back", (void(std::vector<T>::*)(const T &)) &std::vector<T>::push_back)
-            .def("back", (T & (std::vector<T>::*) ()) & std::vector<T>::back)
-            .def("__len__", [](const std::vector<T> &v) { return v.size(); })
-            .def("__iter__",
-                    [](std::vector<T> &v) { return py::make_iterator(v.begin(), v.end()); },
-                    py::keep_alive<0, 1>());
-}
-
 
 void paic_mlir::Node::bind(pybind11::module &m) {
     py::enum_<NodeKind>(m, "NodeKind").value("Constant", Constant).export_values();

@@ -1,20 +1,17 @@
 //
 // Created by Steffi Stumpos on 6/10/22.
 //
-#include <iostream>
 
 #include "MLIRBuilder.h"
+#include "bm/BMDialect.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
-#include "mlir/Target/LLVMIR/Export.h"
-#include "mlir/Transforms/Passes.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
@@ -30,7 +27,6 @@
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorOr.h"
@@ -38,8 +34,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/IR/Module.h"
-
-#include <numeric>
+#include "WorldTypeBuilder.h"
+#include "pybind_utils.h"
 #include <string>
 
 using llvm::ArrayRef;
@@ -60,16 +56,28 @@ namespace mlir {
     class ModuleOp;
 } // namespace mlir
 
+using LogProbList = std::vector<paic_mlir::LogProbQueryTypes, std::allocator<paic_mlir::LogProbQueryTypes>>;
+PYBIND11_MAKE_OPAQUE(LogProbList);
+
 PYBIND11_MODULE(paic_mlir, m) {
     m.doc() = "MVP for pybind module";
     paic_mlir::MLIRBuilder::bind(m);
     paic_mlir::Node::bind(m);
+    py::enum_<paic_mlir::LogProbQueryTypes>(m, "LogProbQueryTypes")
+            .value("TARGET_AND_CHILDREN", paic_mlir::LogProbQueryTypes::TARGET_AND_CHILDREN)
+            .value("ALL_LATENT_VARIABLES", paic_mlir::LogProbQueryTypes::ALL_LATENT_VARIABLES)
+            .value("TARGET", paic_mlir::LogProbQueryTypes::TARGET)
+            .export_values();
+    py::class_<paic_mlir::WorldClassSpec>(m, "WorldClassSpec")
+            .def(py::init<std::vector<paic_mlir::LogProbQueryTypes>>());
+    bind_vector<paic_mlir::LogProbQueryTypes>(m, "LogProbQueryList");
 }
 
 void paic_mlir::MLIRBuilder::bind(py::module &m) {
     py::class_<MLIRBuilder>(m, "MLIRBuilder")
             .def(py::init<py::object>(), py::arg("context") = py::none())
-            .def("to_metal", &MLIRBuilder::to_metal);
+            .def("to_metal", &MLIRBuilder::to_metal)
+            .def("create_world_constructor", &MLIRBuilder::create_constructor_for_type);
 }
 
 paic_mlir::MLIRBuilder::MLIRBuilder(pybind11::object contextObj) {}
@@ -370,4 +378,19 @@ pybind11::float_ paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::Pyt
         throw 0;
     }
     return pybind11::float_(res);
+}
+
+pybind11::cpp_function paic_mlir::MLIRBuilder::create_constructor_for_type(const paic_mlir::WorldClassSpec &worldClassSpec) {
+    // create a type using mlir
+    ::mlir::MLIRContext *context = new ::mlir::MLIRContext();
+    context->loadDialect<mlir::func::FuncDialect>();
+    context->loadDialect<mlir::bm::BMDialect>();
+    context->loadDialect<mlir::math::MathDialect>();
+    context->loadDialect<mlir::arith::ArithmeticDialect>();
+    mlir::registerAllDialects(*context);
+    paic_mlir::WorldTypeBuilder builder(*context);
+
+    // include a c-bound init function to return. for now we just return a dummy function
+    return py::cpp_function([](int i) { return i+1; },
+                            py::arg("number"));
 }

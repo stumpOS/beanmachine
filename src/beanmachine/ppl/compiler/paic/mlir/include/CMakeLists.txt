@@ -13,3 +13,5 @@ add_custom_target(demo_dialect DEPENDS ops.h.inc ops.cpp.inc dialect.h.inc diale
 set(LLVM_TARGET_DEFINITIONS ToyCombine.td)
 mlir_tablegen(ToyCombine.inc -gen-rewriters)
 add_custom_target(toy_combine DEPENDS ToyCombine.inc)
+
+add_subdirectory(bm)
