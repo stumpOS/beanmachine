@@ -47,22 +47,14 @@ class RVMeta:
         return self._type
 
 
-# a meta world has two implementations:
-# (1) a tracer
-# (2) Python implementation
 class MetaWorld(metaclass=ABCMeta):
-    def __init__(self, queries: Iterable[RVIdentifier],
-                 observations: Dict[RVIdentifier, torch.Tensor]):
-        self._queries = queries
-        self._observations = observations
-
     @abstractmethod
     def queries(self) -> Iterable[RVIdentifier]:
-        return self._queries
+        raise NotImplementedError()
 
     @abstractmethod
     def observations(self) -> Dict[RVIdentifier, torch.Tensor]:
-        return self._observations
+        raise NotImplementedError()
 
     @abstractmethod
     def value_of(self, z: RVIdentifier) -> torch.Tensor:
@@ -70,7 +62,7 @@ class MetaWorld(metaclass=ABCMeta):
 
     @abstractmethod
     def latent_variable_count(self) -> int:
-        return list(self._queries).__len__()
+        raise NotImplementedError()
 
     @abstractmethod
     def log_prob(self, of: Optional[Collection[RVIdentifier]] = None) -> torch.Tensor:
@@ -85,8 +77,11 @@ class MetaWorld(metaclass=ABCMeta):
         raise NotImplementedError()
 
     @abstractmethod
-    def hessian_of_log_prob_of_children_given_target(self, target: RVIdentifier, value: torch.Tensor) -> Tuple[
-        torch.Tensor, torch.Tensor]:
+    def children_of(self, rv: RVIdentifier) -> typing.Set[RVIdentifier]:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def parents_of(self, rv: RVIdentifier) -> typing.Set[RVIdentifier]:
         raise NotImplementedError()
 
 
@@ -98,7 +93,6 @@ def copy_from_world(python_world: beanmachine.ppl.world.World) -> RealWorld:
 
 class RealWorld(MetaWorld):
     def __init__(self, queries: Iterable[RVIdentifier], observations: Dict[RVIdentifier, torch.Tensor]):
-        super().__init__(queries, observations)
         self.python_world = beanmachine.ppl.world.World.initialize_world(queries, observations)
 
     def queries(self) -> Iterable[RVIdentifier]:
@@ -111,7 +105,7 @@ class RealWorld(MetaWorld):
         return self.python_world[z]
 
     def latent_variable_count(self) -> int:
-        return list(self._queries).__len__()
+        return len(self.python_world.latent_nodes)
 
     def log_prob(self, of: Optional[Collection[RVIdentifier]] = None) -> torch.Tensor:
         return self.python_world.log_prob(of)
@@ -120,13 +114,46 @@ class RealWorld(MetaWorld):
         variable = self.python_world.get_variable(rv)
         return RVMeta(variable.distribution.support, type(variable.distribution))
 
-    def hessian_of_log_prob_of_children_given_target(self, target: RVIdentifier, value: torch.Tensor) -> Tuple[
-        torch.Tensor, torch.Tensor]:
-        return hessian_of_log_prob(self.python_world, target, value, beanmachine.ppl.utils.tensorops.gradients)
+    def children_of(self, rv: RVIdentifier) -> typing.Set[RVIdentifier]:
+        return self.python_world.get_variable(rv).children
+
+    def parents_of(self, rv: RVIdentifier) -> typing.Set[RVIdentifier]:
+        return self.python_world.get_variable(rv).parents
 
     def replace(self, rv: RVIdentifier, value: torch.Tensor) -> MetaWorld:
         rw = copy_from_world(python_world=self.python_world.replace({rv: value}))
         return rw
 
+class TraceWorld(MetaWorld):
+    def __init__(self, queries: Iterable[RVIdentifier], observations: Dict[RVIdentifier, torch.Tensor]):
+        self.queries()
+        self.statements = []
+
+    def queries(self) -> Iterable[RVIdentifier]:
+        raise NotImplementedError()
+
+    def observations(self) -> Dict[RVIdentifier, torch.Tensor]:
+        raise NotImplementedError()
+
+    def value_of(self, z: RVIdentifier) -> torch.Tensor:
+        raise NotImplementedError()
+
+    def latent_variable_count(self) -> int:
+        raise NotImplementedError()
+
+    def log_prob(self, of: Optional[Collection[RVIdentifier]] = None) -> torch.Tensor:
+        raise NotImplementedError()
+
+    def rv_metadata(self, rv: RVIdentifier) -> torch.distributions.constraints.Constraint:
+        raise NotImplementedError()
+
+    def children_of(self, rv: RVIdentifier) -> typing.Set[RVIdentifier]:
+        raise NotImplementedError()
+
+    def parents_of(self, rv: RVIdentifier) -> typing.Set[RVIdentifier]:
+        raise NotImplementedError()
+
+    def replace(self, rv: RVIdentifier, value: torch.Tensor) -> MetaWorld:
+        raise NotImplementedError()
 
 MetaWorld.register(RealWorld)

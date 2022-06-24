@@ -19,6 +19,7 @@ class _ProposalArgs(NamedTuple):
     beta: torch.Tensor
 
 LOGGER = logging.getLogger("beanmachine")
+from beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.infer.meta_ad import AD
 
 class SingleSiteRealSpaceNMCProposer_MetaWorld(BaseSingleSiteMHProposer_MetaWorld):
     """
@@ -28,8 +29,9 @@ class SingleSiteRealSpaceNMCProposer_MetaWorld(BaseSingleSiteMHProposer_MetaWorl
     [1] Arora, Nim, et al. `Newtonian Monte Carlo: single-site MCMC meets second-order gradient methods`
     """
 
-    def __init__(self, node: beanmachine.ppl.RVIdentifier, alpha: float = 10.0, beta: float = 1.0):
+    def __init__(self, node: beanmachine.ppl.RVIdentifier, ad:AD, alpha: float = 10.0, beta: float = 1.0):
         super().__init__(node)
+        self.ad = ad
         self.alpha_: Union[float, torch.Tensor] = alpha
         self.beta_: Union[float, torch.Tensor] = beta
         self.learning_rate_ = torch.tensor(0.0)
@@ -80,9 +82,14 @@ class SingleSiteRealSpaceNMCProposer_MetaWorld(BaseSingleSiteMHProposer_MetaWorl
             return self._get_proposal_distribution_from_args(self._proposal_args)
 
         node_val = world.value_of(self.node)
-        # only works if node_val is scalar
-        first_order_derivative, second_order_derivative = world.hessian_of_log_prob_of_children_given_target(target=self.node, value=node_val)
+        # can I separate this into a differential function over a function expressed over queries over a graph?
+        def log_prob_children(x:torch.Tensor) -> torch.Tensor:
+            world_with_grad = world.replace(self.node, x)
+            children = world_with_grad.children_of(self.node)
+            score = world_with_grad.log_prob(children.__or__({self.node}))
+            return score
 
+        first_order_derivative, second_order_derivative = self.ad.jacobian_and_hessian(x=node_val, func=log_prob_children)
         if not is_valid(first_order_derivative) or not is_valid(second_order_derivative):
             LOGGER.warning(
                 "Gradient or Hessian is invalid at node {nv}.\n".format(
