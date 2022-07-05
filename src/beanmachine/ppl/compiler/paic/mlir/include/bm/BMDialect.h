@@ -16,7 +16,7 @@
 // of function pointers and an array.
 namespace mlir {
     namespace bm {
-        struct StructTypeStorage;
+        struct WorldTypeStorage;
     }
 }
 #include "bm/bm_dialect.h.inc"
@@ -32,15 +32,15 @@ namespace mlir {
 /// 'Type::TypeBase'. It takes as template parameters the concrete type
 /// (StructType), the base class to use (Type), and the storage class
 /// (StructTypeStorage).
-        class StructType : public mlir::Type::TypeBase<StructType, mlir::Type,
-                StructTypeStorage> {
+        class WorldType : public mlir::Type::TypeBase<WorldType, mlir::Type,
+                WorldTypeStorage> {
         public:
             /// Inherit some necessary constructors from 'TypeBase'.
             using Base::Base;
 
             /// Create an instance of a `StructType` with the given element types. There
             /// *must* be atleast one element type.
-            static StructType get(llvm::ArrayRef<mlir::Type> elementTypes);
+            static WorldType get(llvm::ArrayRef<mlir::Type> elementTypes);
 
             /// Returns the element types of this struct type.
             llvm::ArrayRef<mlir::Type> getElementTypes();

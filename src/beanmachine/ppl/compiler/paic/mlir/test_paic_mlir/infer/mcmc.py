@@ -47,15 +47,11 @@ class Sliced_NMC:
             num_samples: int
     ) -> MonteCarloSamples:
         num_adaptive_samples = 0
+        infer_fnc = lambda world, n: _single_chain_infer(world, lambda w, rv: self.get_proposers(w, rv), n)
         if self.lower:
-            chain_results: tuple[list[Tensor], list[Tensor]] = import_inference(_single_chain_infer)(queries, lambda w,
-                                                                                                                     rv: self.get_proposers(
-                w, rv), observations, num_samples)
+            chain_results: tuple[list[Tensor], list[Tensor]] = import_inference(nmc_infer)(queries, observations, lambda q,o : RealWorld(q,o), infer_fnc, num_samples)
         else:
-            chain_results: tuple[list[Tensor], list[Tensor]] = _single_chain_infer(queries,
-                                                                                   lambda w, rv: self.get_proposers(w,
-                                                                                                                    rv),
-                                                                                   observations, num_samples)
+            chain_results: tuple[list[Tensor], list[Tensor]] = nmc_infer(queries, observations, lambda q,o : RealWorld(q,o), infer_fnc, num_samples)
 
         all_samples = chain_results[0]
         all_log_liklihoods = chain_results[1]
@@ -107,23 +103,29 @@ class Sliced_NMC:
             proposers.append(self._proposers[node])
         return proposers
 
+def nmc_infer(queries: List[RVIdentifier],
+              observations: RVDict,
+              world_creator: Callable[[List[RVIdentifier], RVDict], MetaWorld],
+              inference: Callable[[MetaWorld, int], typing.Tuple[List[torch.Tensor], List[torch.Tensor]]],
+              num_samples: int
+            ) -> typing.Tuple[List[torch.Tensor], List[torch.Tensor]]:
+    return inference(world_creator(queries, observations), num_samples)
 
-def _single_chain_infer(queries: List[RVIdentifier],
+
+def _single_chain_infer(current_world: MetaWorld,
                         get_proposers: Callable[[MetaWorld, Set[RVIdentifier]], List[BaseProposer_MetaWorld]],
-                        observations: RVDict,
                         num_samples: int
                         ) -> typing.Tuple[List[torch.Tensor], List[torch.Tensor]]:
-    current_world = RealWorld(queries, observations)
-    samples = [[] for _ in queries]
-    log_likelihoods = [[] for _ in observations]
+    samples = [[] for _ in current_world.queries()]
+    log_likelihoods = [[] for _ in current_world.observations()]
 
     # Main inference loop
     for _ in range(num_samples):
         world = new_world(current_world, get_proposers, 0)
-        for idx, obs in enumerate(observations):
+        for idx, obs in enumerate(current_world.observations()):
             log_likelihoods[idx].append(world.log_prob([obs]))
         # Extract samples
-        for idx, query in enumerate(queries):
+        for idx, query in enumerate(current_world.queries()):
             raw_val = world.value_of(query)
             if not isinstance(raw_val, torch.Tensor):
                 raise TypeError(

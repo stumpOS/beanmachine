@@ -43,6 +43,7 @@ void paic_mlir::Node::bind(pybind11::module &m) {
             .def(py::init<Location,std::string, Type>()).def("name", &paic_mlir::DeclareValNode::getPyName).def("type", &paic_mlir::DeclareValNode::getType);
 
     py::class_<CallNode, std::shared_ptr<CallNode>, Expression>(m, "CallNode")
+            .def(py::init<Location,const std::string &,std::vector<std::shared_ptr<Expression>>,std::shared_ptr<Expression>,Type>())
             .def(py::init<Location,const std::string &,std::vector<std::shared_ptr<Expression>>,Type>());
 
     py::class_<VarNode, std::shared_ptr<VarNode>, DeclareValNode>(m, "VarNode")

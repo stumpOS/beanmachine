@@ -1,44 +1,60 @@
 import ast
 import inspect
+import paic_mlir
 import typing
 
-# this decorator must identify two methods in the class:
-# 'create_world'
-# infer: [RVIdentifier] -> Tensor
-# The effect of this decorator is that the infer will be modified to instead call the lowered function.
-# The create_world method will not be changed from the user's perspective but this decorator will update that
-# create world method
 import beanmachine.ppl.compiler.bm_to_bmg
 import beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.to_paic_ast
 import beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.utils
 
-
-def import_inference(callable: typing.Callable) -> typing.ClassVar:
+def import_inference(entry_callable: typing.Callable):
     """
     Given:
-    (1) a function that
-        (a) accepts queries, observations. The only read read operation is when creating the world
-        (b) creates a world from queries and observations
+    (1) a function that accepts:
+        (a) queries + observations
+        (b) a function that creates a world from queries and observations
+        (c) a function that accepts a world and returns inference results
     (2) arguments for function (1)
 
     This function will do the following:
-    (1) Generate (note that this will occur in the C++ layer):
+    (1) Generate:
         (a) [FROM FUNC] a world interface IWorld optimized for the given function
         (b) [FROM FUNC] a lowered function that accepts an IWorld
         (c) [FROM ARGS] an implementation of the world identified in (1b)
     (2) invoke the generated function with an instance of the generated implementation
     """
     def wrapper(*args, **kwargs):
-        lines, _ = inspect.getsourcelines(callable)
+        # step 1: WORLD METADATA COLLECTION
+        # get world directions by invoking inference_fnc with a world tracer.
+        # note that to start I'm skipping this step and providing a reasonable standin
+        inference_fnc = kwargs['inference']
+        functions_to_generate = paic_mlir.LogProbQueryList()
+        functions_to_generate.push_back(paic_mlir.LogProbQueryTypes.TARGET)
+        world_metadata = paic_mlir.WorldClassSpec(functions_to_generate)
+        world_metadata.set_print_name("print")
+        world_metadata.set_world_name("MetaWorld")
+        mb = paic_mlir.MLIRBuilder()
+
+        # step 2: INFERENCE COMPILATION
+        # compile the inference_fnc, using the world directions to modify the world calls to match the interface
+        # identified in step 1. At the end of this step, we should have a function to create a world and a function that accepts a world
+        # TODO: include an ast created from "paic_ast_generator" with python_function
+        lines, _ = inspect.getsourcelines(inference_fnc)
         source = "".join(beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.utils._unindent(lines))
         module = ast.parse(source)
         funcdef = module.body[0]
-        # TODO: collect ASTs of query methods
         to_paic = beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.to_paic_ast.paic_ast_generator()
-        globals = beanmachine.ppl.compiler.bm_to_bmg._get_globals(callable)
+        globals = beanmachine.ppl.compiler.bm_to_bmg._get_globals(inference_fnc)
         python_function = to_paic.python_ast_to_paic_ast(funcdef, globals)
-        # TODO: pass the paic ast to the import function instead
-        arg = float(args[0])
-        result = mb.to_metal(python_function, arg)
-        return result
-    return callable
+        inference_functions = mb.create_inference_functions(python_function, world_metadata)
+
+        # step 3:  MODEL COMPILATION
+        # create a world from the model by tracing the queries and observations to create a graph and ungraphing according to trace
+        variables = paic_mlir.Tensor()
+        for i in range(0, 5):
+            variables.push_back(float(i))
+        world = inference_functions.world_with_variables(variables)
+
+        # step 4: invoke the compiled inference function with the world you just created
+        inference_functions.inference_function(world)
+    return wrapper

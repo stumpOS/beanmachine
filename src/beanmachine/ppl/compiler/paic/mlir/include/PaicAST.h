@@ -101,15 +101,27 @@ namespace paic_mlir {
 
     class CallNode : public Expression {
     public:
-        CallNode(Location loc, const std::string &callee,
-                 std::vector<std::shared_ptr<Expression>> args, Type type)
+        CallNode(Location loc,
+                 const std::string &callee,
+                 std::vector<std::shared_ptr<Expression>> args,
+                 Type type)
                 : Expression(std::move(loc), NodeKind::Call, std::move(type)), _function(callee),
-                  args(args) {}
+                  args(args), _receiver(nullptr) {}
+        CallNode(Location loc,
+                 const std::string &callee,
+                 std::vector<std::shared_ptr<Expression>> args,
+                 std::shared_ptr<Expression> receiver,
+                 Type type)
+                : Expression(std::move(loc), NodeKind::Call, std::move(type)), _function(callee),
+                  args(args), _receiver(receiver) {}
 
         llvm::StringRef getCallee() { return _function; }
+        std::shared_ptr<Expression> getReceiver() { return _receiver; }
         llvm::ArrayRef<std::shared_ptr<Expression>> getArgs() { return args; }
+        static bool classof(const Node*c) { return c->getKind() == paic_mlir::NodeKind::Call; }
     private:
         std::string _function;
+        std::shared_ptr<Expression> _receiver;
         std::vector<std::shared_ptr<Expression>> args;
     };
 

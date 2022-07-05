@@ -84,6 +84,9 @@ class MetaWorld(metaclass=ABCMeta):
     def parents_of(self, rv: RVIdentifier) -> typing.Set[RVIdentifier]:
         raise NotImplementedError()
 
+    @abstractmethod
+    def print(self):
+        raise NotImplementedError()
 
 def copy_from_world(python_world: beanmachine.ppl.world.World) -> RealWorld:
     rw = RealWorld([], {})
@@ -124,6 +127,9 @@ class RealWorld(MetaWorld):
         rw = copy_from_world(python_world=self.python_world.replace({rv: value}))
         return rw
 
+    def print(self):
+        print(str(self.python_world))
+
 class TraceWorld(MetaWorld):
     def __init__(self, queries: Iterable[RVIdentifier], observations: Dict[RVIdentifier, torch.Tensor]):
         self.queries()
@@ -154,6 +160,9 @@ class TraceWorld(MetaWorld):
         raise NotImplementedError()
 
     def replace(self, rv: RVIdentifier, value: torch.Tensor) -> MetaWorld:
+        raise NotImplementedError()
+
+    def print(self):
         raise NotImplementedError()
 
 MetaWorld.register(RealWorld)

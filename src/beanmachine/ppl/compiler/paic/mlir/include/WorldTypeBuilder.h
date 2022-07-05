@@ -27,6 +27,8 @@ namespace paic_mlir {
         // the module will contain a type
         mlir::ModuleOp generate_op(paic_mlir::WorldClassSpec const& worldClassSpec);
     private:
+        mlir::Location generated_loc();
+        std::pair<mlir::ArrayAttr, mlir::Type> getConstantAttr(std::vector<float> &values);
         mlir::ModuleOp theModule;
         mlir::OpBuilder builder;
         llvm::ScopedHashTable<llvm::StringRef, mlir::Value> symbolTable;

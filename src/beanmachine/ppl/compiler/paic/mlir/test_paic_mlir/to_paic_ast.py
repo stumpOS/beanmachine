@@ -14,20 +14,22 @@ class MLIRCompileError(Exception):
 
 class paic_ast_generator:
     def __init__(self):
+        self.unitType = paic_mlir.Type("unit")
         self.floatType = paic_mlir.Type("float")
-        self.type_map = {'float': self.floatType }
+        self.worldType = paic_mlir.Type("MetaWorld")
+        self.type_map = {'float': self.floatType, 'MetaWorld' : self.worldType }
 
     def python_ast_to_paic_ast(self, function_def: _ast.FunctionDef, globals:typing.Dict) -> paic_mlir.PythonFunction:
         param_list = paic_mlir.ParamList()
         symbols: typing.Dict[str, paic_mlir.DeclareValNode] = {}
-
+        ret_value_type = self.unitType
         # validate function
         if isinstance(function_def, _ast.FunctionDef):
             for a in function_def.args.args:
                 if isinstance(a, _ast.arg):
                     if isinstance(a.annotation, _ast.Name):
                         if not self.type_map.__contains__(a.annotation.id):
-                            raise MLIRCompileError("all arguments must have types in order to be translated into llvm ir")
+                            raise MLIRCompileError("all arguments must have types in order to be translated into mlir ir")
                         param_node = paic_mlir.ParamNode(paic_mlir.Location(0, 0), a.arg, self.type_map[a.annotation.id])
                         param_list.push_back(param_node)
                         symbols[a.arg] = param_node
@@ -108,17 +110,53 @@ class paic_ast_generator:
                 var_node = paic_mlir.VarNode(paic_mlir.Location(0, 0), result_name, call_node.type(), call_node)
                 node_list.push_back(var_node)
                 symbols[result_name] = var_node
+            elif isinstance(python_node, _ast.Expr):
+                node = python_node.value
+                if isinstance(node, ast.Call):
+                    expList = paic_mlir.ExpList()
+                    fnc = node.func
+                    fnc_name = ""
+                    receiver = None
+                    if isinstance(fnc, ast.Attribute):
+                        if isinstance(fnc.value, ast.Name):
+                            # is the expression a call on a receiver?
+                            if symbols.__contains__(fnc.value.id):
+                                ref = symbols[fnc.value.id]
+                                fnode = paic_mlir.GetValNode(paic_mlir.Location(0, 0), ref.name(), ref.type())
+                                fnc_name = fnc.attr
+                                receiver = fnode
+                    for a in node.args:
+                        if isinstance(a, ast.Name):
+                            if not symbols.__contains__(a.id):
+                                raise MLIRCompileError("only local variables are referenceable")
+                            ref = symbols[a.id]
+                            fnode = paic_mlir.GetValNode(paic_mlir.Location(0, 0), ref.name(), ref.type())
+                            expList.push_back(fnode)
+                        elif isinstance(a, ast.Constant):
+                            # TODO: support more than floats
+                            fnode = paic_mlir.FloatNode(paic_mlir.Location(0, 0), a.value)
+                            expList.push_back(fnode)
+                    if fnc_name == "":
+                        fnc_name = beanmachine.ppl.compiler.paic.mlir.test_paic_mlir.utils.to_name(node.func)
+                    if receiver is None:
+                        call_node = call_node = paic_mlir.CallNode(paic_mlir.Location(0, 0), fnc_name, expList, self.unitType)
+                    else:
+                        call_node = paic_mlir.CallNode(paic_mlir.Location(0, 0), fnc_name, expList, receiver, self.unitType)
+                    node_list.push_back(call_node)
             elif isinstance(python_node, _ast.Return):
                 if not isinstance(python_node.value, _ast.Name):
                     raise MLIRCompileError("no nesting allowed. Problem is return statement in " + function_def.name)
                 if not symbols.__contains__(python_node.value.id):
                     raise MLIRCompileError("only local variables are referencable")
                 ret_value = symbols[python_node.value.id]
+                ret_value_type = ret_value.type()
                 ret_node = paic_mlir.ReturnNode(paic_mlir.Location(0, 0),
                                                 paic_mlir.GetValNode(paic_mlir.Location(0, 0), ret_value.name(),
                                                                      ret_value.type()))
                 node_list.push_back(ret_node)
+            else:
+                raise MLIRCompileError("Unsupported statement: " + str(python_node))
 
         body = paic_mlir.make_block_ptr(paic_mlir.Location(0, 0), node_list)
-        python_function = paic_mlir.PythonFunction(paic_mlir.Location(0,0), function_def.name, ret_value.type(), param_list, body)
+        python_function = paic_mlir.PythonFunction(paic_mlir.Location(0,0), function_def.name, ret_value_type, param_list, body)
         return python_function
