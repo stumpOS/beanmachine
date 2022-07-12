@@ -30,6 +30,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/IR/Verifier.h"
 
 #include "WorldTypeBuilder.h"
 #include "pybind_utils.h"
@@ -45,8 +46,6 @@ using llvm::ScopedHashTableScope;
 using llvm::SmallVector;
 using llvm::StringRef;
 using llvm::Twine;
-
-
 
 namespace py = pybind11;
 namespace mlir {
@@ -137,6 +136,11 @@ pybind11::float_ paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::Pyt
         if (!llvmModule) {
             llvm::errs() << "Failed to emit LLVM IR\n";
         }
+        bool BrokenDebugInfo = false;
+        llvm::Module *module = llvmModule.get();
+        if (llvm::verifyModule(*module, &llvm::errs(), &BrokenDebugInfo)){
+            llvm::errs() << "LLVM IR invalid\n";
+        }
         llvmModule->dump();
         return llvmModule;
     });
@@ -157,25 +161,21 @@ pybind11::float_ paic_mlir::MLIRBuilder::to_metal(std::shared_ptr<paic_mlir::Pyt
 
 std::shared_ptr<paic_mlir::InferenceFunctions> paic_mlir::MLIRBuilder::create_inference_functions(std::shared_ptr<paic_mlir::PythonFunction> function, const paic_mlir::WorldClassSpec &worldClassSpec) {
     std::string function_name = function->getName().data();
-    
-
-
     std::vector<std::shared_ptr<PythonFunction>> functions{ function };
     std::shared_ptr<PythonModule> py_module = std::make_shared<PythonModule>(functions);
-
 
     py::cpp_function world_init = py::cpp_function([](std::shared_ptr<Tensor> v) {
         // should return type !llvm.ptr<struct<(i64, ptr<i8>)>>
         std::shared_ptr<paic_mlir::AbstractWorld> world = std::make_shared<paic_mlir::AbstractWorld>();
-        world->data = new float[v->size()];
+        world->_data = new double[v->size()];
+        world->_size = v->size();
         for(int i=0;i<v->size();i++){
-            world->data[i] = v->at(i)+1;
+            world->_data[i] = v->at(i);
         }
         return world;
         }, py::arg("variables"));
     py::cpp_function inference_fnc;
     if(std::strcmp((function->getType().getName()).data(), "unit") == 0){
-        
             inference_fnc = py::cpp_function([worldClassSpec, py_module, function_name](std::shared_ptr<paic_mlir::AbstractWorld> world) {
                 // create a type using mlir
             ::mlir::MLIRContext *context = new ::mlir::MLIRContext();
@@ -194,25 +194,18 @@ std::shared_ptr<paic_mlir::InferenceFunctions> paic_mlir::MLIRBuilder::create_in
             mlir::ModuleOp mlir_module = generator.generate_op(py_module);
             mlir_module->dump();
 
-            // todo: add passes and run module
+            // todo: clean up passes. I don't think you need all these conversion passes; I think some can be nested
             mlir::PassManager pm(context);
             pm.addPass(mlir::bm::createLowerToFuncPass());
-            pm.addPass(mlir::createConvertFuncToLLVMPass());
-            pm.addPass(mlir::createMemRefToLLVMPass());
-            pm.addPass(mlir::createConvertMathToLLVMPass());
-            //pm.addPass(mlir::bm::createLowerToLLVMPass());
-            pm.addPass(mlir::arith::createConvertArithmeticToLLVMPass());
-
+            pm.addPass(mlir::bm::createLowerToLLVMPass());
             auto result = pm.run(mlir_module);
     
             // Lower to machine code
             llvm::InitializeNativeTarget();
             llvm::InitializeNativeTargetAsmPrinter();
             mlir::registerLLVMDialectTranslation(*(mlir_module->getContext()));
-                // An optimization pipeline to use within the execution engine.
-            auto optPipeline = mlir::makeOptimizingTransformer(
-            /*optLevel=*/3, /*sizeLevel=*/0,
-            /*targetMachine=*/nullptr);
+            // disable optimizations (change first parameter to 3 to enable)
+            auto optPipeline = mlir::makeOptimizingTransformer(0, 0, nullptr);
 
             // Create an MLIR execution engine. The execution engine eagerly JIT-compiles
             // the module.
@@ -230,13 +223,16 @@ std::shared_ptr<paic_mlir::InferenceFunctions> paic_mlir::MLIRBuilder::create_in
             auto maybeEngine = mlir::ExecutionEngine::create(mlir_module, engineOptions);
             assert(maybeEngine && "failed to construct an execution engine");
             auto &engine = maybeEngine.get();
-            auto invocationResult = engine->invoke(function_name, world->index, world->data);
+            std::vector<double*> values(2);
+            //values[0] = world->_data;
+            values[1] = world->_data;
+
+            auto ref = llvm::makeArrayRef(values);
+            auto invocationResult = engine->invoke(function_name, ref, ref, 0, (int)world->_size, 1);
             if (invocationResult) {
                 llvm::errs() << "JIT invocation failed\n";
-            } else {
-                std::cout << "bugs fixed";
             }
-            delete[] world->data;
+            delete[] world->_data;
         }, py::arg("world"));
     } else {
         llvm::errs() << "Only unit valued inference methods are supported atm\n";

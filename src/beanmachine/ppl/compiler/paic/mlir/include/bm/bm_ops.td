@@ -142,7 +142,7 @@ def PrintWorldOp : BM_Op<"print_world"> {
     }];
 
     // The print operation takes an input tensor to print.
-    let arguments = (ins AnyTypeOf<[BM_WorldType]>:$input);
+    let arguments = (ins AnyTypeOf<[BM_WorldType, F64MemRef, F32MemRef]>:$input);
 
     let assemblyFormat = "$input attr-dict `:` type($input)";
 }

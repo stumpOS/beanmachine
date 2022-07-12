@@ -37,7 +37,7 @@ using namespace mlir;
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Lowers `toy.print` to a loop nest calling `printf` on each of the individual
+/// Lowers `bm.print_world` to a loop nest calling `printf` on each of the individual
 /// elements of the array.
     class PrintWorldOpLowering : public ConversionPattern {
     public:
@@ -55,10 +55,8 @@ namespace {
 
             // Get a symbol reference to the printf function, inserting it if necessary.
             auto printfRef = getOrInsertPrintf(rewriter, parentModule);
-            Value formatSpecifierCst = getOrCreateGlobalString(
-                    loc, rewriter, "frmt_spec", StringRef("%f \0", 4), parentModule);
-            Value newLineCst = getOrCreateGlobalString(
-                    loc, rewriter, "nl", StringRef("\n\0", 2), parentModule);
+            Value formatSpecifierCst = getOrCreateGlobalString(loc, rewriter, "frmt_spec", StringRef("%F \0", 4), parentModule);
+            Value newLineCst = getOrCreateGlobalString(loc, rewriter, "nl", StringRef("\n\0", 2), parentModule);
 
             // Create a loop for each of the dimensions within the shape.
             SmallVector<Value, 4> loopIvs;
@@ -86,11 +84,12 @@ namespace {
 
             // Generate a call to printf for the current element of the loop.
             auto printOp = cast<bm::PrintWorldOp>(op);
-            auto elementLoad =
-                    rewriter.create<memref::LoadOp>(loc, printOp.getInput(), loopIvs);
-            rewriter.create<func::CallOp>(
-                    loc, printfRef, rewriter.getIntegerType(32),
-                    ArrayRef<Value>({formatSpecifierCst, elementLoad}));
+            mlir::Value elementLoad = rewriter.create<memref::LoadOp>(loc, printOp.getInput(), loopIvs);
+            mlir::Value constant = rewriter.create<mlir::arith::ConstantFloatOp>(loc, llvm::APFloat((double)4.7), rewriter.getF64Type());
+            // printf is a vararg function that takes at least one pointer to i8 (char in C), which returns an integer
+            TypeRange results(rewriter.getIntegerType(32));
+            ArrayRef<Value> print_operands({formatSpecifierCst, elementLoad});
+            rewriter.create<func::CallOp>(loc, printfRef, results, print_operands);
 
             // Notify the rewriter that this operation has been removed.
             rewriter.eraseOp(op);
@@ -173,6 +172,7 @@ void BMToLLVMLoweringPass::runOnOperation() {
     // the LLVM dialect.
     LLVMConversionTarget target(getContext());
     target.addLegalOp<ModuleOp>();
+    //target.addLegalDialect<mlir::LLVMDialect>();
 
     // During this lowering, we will also be lowering the MemRef types, that are
     // currently being operated on, to a representation in LLVM. To perform this

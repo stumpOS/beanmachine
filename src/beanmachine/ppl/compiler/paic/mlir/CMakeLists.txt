@@ -84,6 +84,10 @@ target_link_libraries(PAIC_IR
 add_llvm_executable(PPL test/main.cpp)
 target_link_libraries(PPL PRIVATE PAIC_IR)
 
+# test 2
+add_llvm_executable(NO_PY test/main2.cpp)
+target_link_libraries(NO_PY PRIVATE PAIC_IR)
+
 # pybind module
 set(CMAKE_CXX_FLAGS "-g -O0")
 pybind11_add_module(paic_mlir python/MLIRBuilder.cpp python/PaicAST.cpp python/WorldTypeBuilder.cpp)

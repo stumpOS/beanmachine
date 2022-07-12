@@ -114,7 +114,7 @@ namespace {
                 // What does this mean? A: the interpretation is up to the backend (e.g. LLVM)
                 mlir::Attribute memSpace = mlir::IntegerAttr::get(mlir::IntegerType::get(builder.getContext(), 64), 7);
                 mlir::ShapedType unrankedTensorType = mlir::UnrankedMemRefType::get(builder.getF32Type(), memSpace);
-                return unrankedTensorType;
+                return builder.getF32Type();
             } else {
                 auto member_types_maybe = _external_types.find(type_name);
                 // TODO: protect against recursion
@@ -289,11 +289,11 @@ namespace {
                         return mlir::failure();
                     continue;
                 }
-//                if (auto *var = dyn_cast<paic_mlir::CallNode>(expr.get())) {
-//                    if (!mlirGen_Expression(var))
-//                        return mlir::failure();
-//                    continue;
-//                }
+               if (auto *var = dyn_cast<paic_mlir::CallNode>(expr.get())) {
+                   if (!mlirGen_Expression(var))
+                       return mlir::failure();
+                   continue;
+               }
                 if (auto *var = dyn_cast<paic_mlir::ReturnNode>(expr.get())) {
                     if (mlir::failed(mlirGen(var)))
                         return mlir::failure();

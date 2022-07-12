@@ -32,6 +32,7 @@ void BMDialect::initialize() {
 
 namespace mlir {
     namespace bm {
+
         struct WorldTypeStorage : public mlir::TypeStorage {
             /// The `KeyTy` is a required type that provides an interface for the storage
             /// instance. This type will be used when uniquing an instance of the type
@@ -82,6 +83,7 @@ namespace mlir {
             /// The following field contains the element types of the struct.
             llvm::ArrayRef<mlir::Type> elementTypes;
         };
+
     }
 }
 

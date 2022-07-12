@@ -124,8 +124,18 @@ int execute_mlir(std::ostream &os, std::string filename){
 
     // Create an MLIR execution engine. The execution engine eagerly JIT-compiles
     // the module.
+    module->dump();
     mlir::ExecutionEngineOptions engineOptions;
     engineOptions.transformer = optPipeline;
+//    engineOptions.llvmModuleBuilder = llvm::function_ref<std::unique_ptr<llvm::Module>(mlir::ModuleOp,llvm::LLVMContext &)>([](mlir::ModuleOp mod, llvm::LLVMContext &llvmContext){
+//        std::unique_ptr<llvm::Module> llvmModule = mlir::translateModuleToLLVMIR(mod, llvmContext);
+//        if (!llvmModule) {
+//            llvm::errs() << "Failed to emit LLVM IR\n";
+//        }
+//
+//        llvmModule->dump();
+//        return llvmModule;
+//    });
     auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
     assert(maybeEngine && "failed to construct an execution engine");
     auto &engine = maybeEngine.get();

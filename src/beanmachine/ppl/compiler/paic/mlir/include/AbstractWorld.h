@@ -7,8 +7,8 @@
 
 namespace paic_mlir {
     struct AbstractWorld {
-        int index;
-        float *data;
+        size_t _size;
+        double *_data;
     };
 }
 
