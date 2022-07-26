@@ -37,7 +37,8 @@ namespace paic2 {
 
     enum TypeKind {
         Primitive,
-        World
+        World,
+       // Tensor
     };
 
     class Type {
@@ -62,6 +63,18 @@ namespace paic2 {
     private:
         PrimitiveCode _code;
     };
+
+//    class TensorType : public Type {
+//    public:
+//        TensorType(PrimitiveCode code, std::vector<int64_t> const& shape):Type(Tensor),_code(code), _shape(shape){}
+//        TensorType(PrimitiveCode code, int64_t length):Type(Tensor),_code(code){_shape.push_back(length);}
+//        PrimitiveCode code()const{return _code;}
+//        static bool classof(const Type*c) { return c->getKind() == Tensor; }
+//        std::vector<int64_t> shape()const{return _shape;}
+//    private:
+//        PrimitiveCode _code;
+//        std::vector<int64_t> _shape;
+//    };
 
     class WorldType : public Type {
     public:
@@ -186,6 +199,11 @@ namespace paic2 {
     public:
         FloatConstNode(Location location, float value): ConstNode<float>(location, std::make_shared<PrimitiveType>(Float), value){}
     };
+
+//    class FloatVectorConstNode : public ConstNode<std::shared_ptr<std::vector<float>>> {
+//    public:
+//        FloatVectorConstNode(Location location, std::shared_ptr<std::vector<float>> value): ConstNode<std::shared_ptr<std::vector<float>>>(location, std::make_shared<TensorType>(Float, value->size()), value){}
+//    };
 
     class ReturnNode : public Node {
     public:

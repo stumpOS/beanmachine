@@ -43,7 +43,7 @@ class WorldTest(unittest.TestCase):
         foo_value = dist.Normal(tensor(2.0), tensor(2.0)).sample(torch.Size((1, 1)))
         observations = {}
         bar_parent = dist.Normal(foo_value, torch.tensor(1.0))
-        for i in range(0, 20):
+        for i in range(0, 3):
             observations[model.bar(i)] = bar_parent.sample(torch.Size((1, 1)))
 
         # calling entry point of fake inference is logically equivalent to calling fake_inference with a world we created

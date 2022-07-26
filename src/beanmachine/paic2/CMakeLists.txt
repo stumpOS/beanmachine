@@ -92,6 +92,57 @@ add_mlir_library(PAIC2_LIB
         MLIRJitRunner
         )
 
+add_mlir_library(NO_PY_PAIC2_LIB
+        src/NoPyMLIRBuilder.cpp
+        src/bm/dialect.cpp
+        src/bm/LowerToLLVM.cpp
+        src/bm/LowerToFunc.cpp
+
+        DEPENDS
+        bm_dialect
+
+        LINK_COMPONENTS
+        Core
+        CodeGen
+        AsmPrinter
+        Analysis
+        IRReader
+        #        OrcTargetProcess
+        #        OrcShared
+        #        TransformUtils
+        #        X86AsmParser
+        #        X86CodeGen
+        Support
+        nativecodegen
+        OrcJIT
+        Target
+        JITLink
+        ExecutionEngine
+
+        LINK_LIBS PUBLIC
+        ${dialect_libs}
+        ${conversion_libs}
+        MLIRIR
+        MLIRSupport
+
+        MLIRAnalysis
+        MLIRCallInterfaces
+        MLIRCastInterfaces
+        MLIRExecutionEngine
+        MLIRIR
+        MLIRDialect
+        MLIRLLVMCommonConversion
+        MLIRLLVMDialect
+        MLIRLLVMIRTransforms
+        MLIRLLVMToLLVMIRTranslation
+        MLIRParser
+        MLIRPass
+        MLIRSideEffectInterfaces
+        MLIRSupport
+        MLIRTargetLLVMIRExport
+        MLIRTransforms
+        MLIRJitRunner
+        )
 #target_compile_options (PAIC2_LIB PUBLIC -fexceptions)
 #target_compile_options (PAIC2_LIB PUBLIC -frtti)
 #set(LIBS ${dialect_libs} ${conversion_libs})
@@ -106,6 +157,9 @@ set(CMAKE_CXX_FLAGS "-g -O0")
 pybind11_add_module(paic2 src/pymod.cpp)
 target_include_directories(paic2 PUBLIC include)
 target_link_libraries(paic2 PRIVATE PAIC2_LIB)
+
+add_executable(NO_PY src/no_py.cpp)
+target_link_libraries(NO_PY PRIVATE NO_PY_PAIC2_LIB)
 
 # EXAMPLE_VERSION_INFO is defined by setup.py and passed into the C++ code as a
 # define (VERSION_INFO) here.

@@ -48,7 +48,7 @@ namespace {
 
             // Get a symbol reference to the printf function, inserting it if necessary.
             auto printfRef = getOrInsertPrintf(rewriter, parentModule);
-            Value formatSpecifierCst = getOrCreateGlobalString(loc, rewriter, "frmt_spec", StringRef("%F \0", 4), parentModule);
+            Value formatSpecifierCst = getOrCreateGlobalString(loc, rewriter, "frmt_spec", StringRef("%e \0", 4), parentModule);
             Value newLineCst = getOrCreateGlobalString(loc, rewriter, "nl", StringRef("\n\0", 2), parentModule);
 
             // Create a loop for each of the dimensions within the shape.

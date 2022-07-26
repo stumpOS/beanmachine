@@ -1,7 +1,7 @@
 //
-// Created by Steffi Stumpos on 7/15/22.
+// Created by Steffi Stumpos on 7/25/22.
 //
-#include "MLIRBuilder.h"
+#include "NoPyMLIRBuilder.h"
 #include <mlir/Target/LLVMIR/Export.h>
 #include "bm/passes.h"
 #include "mlir/InitAllDialects.h"
@@ -24,13 +24,7 @@
 #include "llvm/MC/TargetRegistry.h"
 
 #include "bm/BMDialect.h"
-#include "pybind_utils.h"
-#include <pybind11/stl_bind.h>
 #include "llvm/MC/TargetRegistry.h"
-//#include "llvm/ADT/Triple.h"
-
-using Tensor = std::vector<float, std::allocator<float>>;
-PYBIND11_MAKE_OPAQUE(Tensor);
 
 using llvm::ArrayRef;
 using llvm::cast;
@@ -42,7 +36,6 @@ using llvm::SmallVector;
 using llvm::StringRef;
 using llvm::Twine;
 
-namespace py = pybind11;
 namespace mlir {
     class MLIRContext;
     template <typename OpTy>
@@ -50,25 +43,25 @@ namespace mlir {
     class ModuleOp;
 } // namespace mlir
 
-// a world constant op should not be represented in python. Therefore do not expose world constant op as paic2 ast nodes.
+// a world constant op should not be represented in python. Therefore do not expose world constant op as nopy ast nodes.
 // Instead, we will add the world const op separately.
 // In order to do so, we only need the init data, world name, world element type, and world size
 struct WorldLocalVar {
-    WorldLocalVar(paic2::Location loc,std::string const& name, mlir::bm::WorldType const& wt):_loc(loc), _name(name), _worldType(wt){}
-    paic2::Location _loc;
+    WorldLocalVar(nopy::Location loc,std::string const& name, mlir::bm::WorldType const& wt):_loc(loc), _name(name), _worldType(wt){}
+    nopy::Location _loc;
     std::string _name;
     mlir::bm::WorldType _worldType;
 };
 
 class MLIRGenImpl {
 public:
-    MLIRGenImpl(mlir::MLIRContext &context, paic2::WorldSpec const& spec) : builder(&context), _world_spec(spec){}
-    mlir::ModuleOp generate_op(std::shared_ptr<paic2::PythonModule> pythonModule) {
+    MLIRGenImpl(mlir::MLIRContext &context, nopy::WorldSpec const& spec) : builder(&context), _world_spec(spec){}
+    mlir::ModuleOp generate_op(std::shared_ptr<nopy::PythonModule> pythonModule) {
         // We create an empty MLIR module and codegen functions one at a time and
         // add them to the module.
         theModule = mlir::ModuleOp::create(builder.getUnknownLoc());
 
-        for (std::shared_ptr<paic2::PythonFunction> f : pythonModule->getFunctions()){
+        for (std::shared_ptr<nopy::PythonFunction> f : pythonModule->getFunctions()){
             generate_op(f);
         }
 
@@ -84,26 +77,26 @@ public:
 private:
     mlir::ModuleOp theModule;
     mlir::OpBuilder builder;
-    paic2::WorldSpec _world_spec;
+    nopy::WorldSpec _world_spec;
     llvm::ScopedHashTable<llvm::StringRef, mlir::Value> symbolTable;
 
-    mlir::Location loc(const paic2::Location &loc) {
+    mlir::Location loc(const nopy::Location &loc) {
         return mlir::FileLineColLoc::get(builder.getStringAttr("file_not_implemented_yet"), loc.getLine(),
                                          loc.getCol());
     }
 
-    mlir::Type typeForCode(paic2::PrimitiveCode code){
+    mlir::Type typeForCode(nopy::PrimitiveCode code){
         switch(code){
-            case paic2::PrimitiveCode::Float:
-                return builder.getF32Type();
-            case paic2::PrimitiveCode::Void:
+            case nopy::PrimitiveCode::Float:
+                return builder.getF64Type();
+            case nopy::PrimitiveCode::Void:
                 return builder.getNoneType();
             default:
                 throw std::invalid_argument("unrecognized primitive type");
         }
     }
 
-    mlir::bm::WorldType worldTypeFromDesc(paic2::WorldType* wt){
+    mlir::bm::WorldType worldTypeFromDesc(nopy::WorldType* wt){
         std::vector<mlir::Type> members;
         mlir::Type elementType = typeForCode(wt->nodeType());
         ArrayRef<int64_t> shape(wt->length());
@@ -114,10 +107,10 @@ private:
 
     // There are two types supported: PrimitiveType and the builtin type WorldType
     // A World type is compiled into a composite type that contains an array, sets of function pointers, and metadata
-    mlir::Type getType(std::shared_ptr<paic2::Type> type) {
-        if(auto *var = dyn_cast<paic2::PrimitiveType>(type.get())){
+    mlir::Type getType(std::shared_ptr<nopy::Type> type) {
+        if(auto *var = dyn_cast<nopy::PrimitiveType>(type.get())){
             return typeForCode(var->code());
-        } else if (auto *var = dyn_cast<paic2::WorldType>(type.get())) {
+        } else if (auto *var = dyn_cast<nopy::WorldType>(type.get())) {
             return worldTypeFromDesc(var);
         }
         throw std::invalid_argument("unrecognized primitive type");
@@ -130,7 +123,7 @@ private:
         return mlir::success();
     }
 
-    mlir::Value mlirGen(paic2::GetValNode* expr) {
+    mlir::Value mlirGen(nopy::GetValNode* expr) {
         if (auto variable = symbolTable.lookup(expr->getName()))
             return variable;
 
@@ -139,7 +132,7 @@ private:
         return nullptr;
     }
 
-    mlir::LogicalResult mlirGen(paic2::ReturnNode* ret) {
+    mlir::LogicalResult mlirGen(nopy::ReturnNode* ret) {
         auto location = loc(ret->loc());
         mlir::Value expr = nullptr;
         if (ret->getValue()) {
@@ -150,13 +143,13 @@ private:
         return mlir::success();
     }
 
-    mlir::Value mlirGen(paic2::CallNode* call) {
+    mlir::Value mlirGen(nopy::CallNode* call) {
         llvm::StringRef callee = call->getCallee();
         auto location = loc(call->loc());
 
         // Codegen the operands first.
         SmallVector<mlir::Value, 4> operands;
-        for (std::shared_ptr<paic2::Expression> expr : call->getArgs()) {
+        for (std::shared_ptr<nopy::Expression> expr : call->getArgs()) {
             auto arg = mlirGen(expr.get());
             if (!arg)
                 return nullptr;
@@ -180,11 +173,11 @@ private:
         return nullptr;
     }
 
-    mlir::OpState opFromCall(paic2::CallNode* call) {
+    mlir::OpState opFromCall(nopy::CallNode* call) {
         llvm::StringRef callee = call->getCallee();
         auto location = loc(call->loc());
         SmallVector<mlir::Value, 4> operands;
-        for (std::shared_ptr<paic2::Expression> expr : call->getArgs()) {
+        for (std::shared_ptr<nopy::Expression> expr : call->getArgs()) {
             auto arg = mlirGen(expr.get());
             if (!arg)
                 throw std::invalid_argument("invalid argument during expression generation");
@@ -209,18 +202,18 @@ private:
         }
     }
 
-    mlir::Value mlirGen(paic2::Expression* expr) {
+    mlir::Value mlirGen(nopy::Expression* expr) {
         switch (expr->getKind()) {
-            case paic2::NodeKind::GetVal:
-                return mlirGen(dynamic_cast<paic2::GetValNode*>(expr));
-            case paic2::NodeKind::Constant:
+            case nopy::NodeKind::GetVal:
+                return mlirGen(dynamic_cast<nopy::GetValNode*>(expr));
+            case nopy::NodeKind::Constant:
             {
-                auto primitive_type = dynamic_cast<paic2::PrimitiveType*>(expr->getType().get());
+                auto primitive_type = dynamic_cast<nopy::PrimitiveType*>(expr->getType().get());
                 if(primitive_type){
                     switch(primitive_type->code()){
-                        case paic2::PrimitiveCode::Float:{
-                            auto const_type = dynamic_cast<paic2::FloatConstNode*>(expr);
-                            return builder.create<mlir::arith::ConstantFloatOp>(loc(expr->loc()), llvm::APFloat(const_type->getValue()), builder.getF32Type());
+                        case nopy::PrimitiveCode::Float:{
+                            auto const_type = dynamic_cast<nopy::FloatConstNode*>(expr);
+                            return builder.create<mlir::arith::ConstantFloatOp>(loc(expr->loc()), llvm::APFloat(const_type->getValue()), builder.getF64Type());
                         }
                         default:
                             throw std::invalid_argument("only float primitives are supported now");
@@ -229,8 +222,8 @@ private:
                     throw std::invalid_argument("only primitives are supported now");
                 }
             }
-            case paic2::NodeKind::Call:
-                return mlirGen(dynamic_cast<paic2::CallNode*>(expr));
+            case nopy::NodeKind::Call:
+                return mlirGen(dynamic_cast<nopy::CallNode*>(expr));
             default:
                 emitError(loc(expr->loc()))
                         << "MLIR codegen encountered an unhandled expr kind '"
@@ -239,8 +232,8 @@ private:
         }
     }
 
-    mlir::Value mlirGen(paic2::VarNode* vardecl) {
-        std::shared_ptr<paic2::Expression> init = vardecl->getInitVal();
+    mlir::Value mlirGen(nopy::VarNode* vardecl) {
+        std::shared_ptr<nopy::Expression> init = vardecl->getInitVal();
         if (!init) {
             emitError(loc(vardecl->loc()),"missing initializer in variable declaration");
             return nullptr;
@@ -253,7 +246,7 @@ private:
         return value;
     }
 
-    mlir::LogicalResult mlirGen(std::shared_ptr<paic2::BlockNode> blockNode, std::shared_ptr<WorldLocalVar> world_var) {
+    mlir::LogicalResult mlirGen(std::shared_ptr<nopy::BlockNode> blockNode, std::shared_ptr<WorldLocalVar> world_var) {
         ScopedHashTableScope<StringRef, mlir::Value> varScope(symbolTable);
         if(world_var != nullptr){
             // create world op
@@ -268,18 +261,18 @@ private:
                 return mlir::failure();
             }
         }
-        for (std::shared_ptr<paic2::Node> expr : blockNode->getChildren()) {
-            if (auto *var = dyn_cast<paic2::VarNode>(expr.get())) {
+        for (std::shared_ptr<nopy::Node> expr : blockNode->getChildren()) {
+            if (auto *var = dyn_cast<nopy::VarNode>(expr.get())) {
                 if (!mlirGen(var))
                     return mlir::failure();
                 continue;
             }
-            if (auto *var = dyn_cast<paic2::CallNode>(expr.get())) {
+            if (auto *var = dyn_cast<nopy::CallNode>(expr.get())) {
                 if (!opFromCall(var))
                     return mlir::failure();
                 continue;
             }
-            if (auto *var = dyn_cast<paic2::ReturnNode>(expr.get())) {
+            if (auto *var = dyn_cast<nopy::ReturnNode>(expr.get())) {
                 if (mlir::failed(mlirGen(var)))
                     return mlir::failure();
                 continue;
@@ -289,16 +282,16 @@ private:
     }
 
 
-    mlir::bm::FuncOp generate_op(std::shared_ptr<paic2::PythonFunction> &pythonFunction) {
+    mlir::bm::FuncOp generate_op(std::shared_ptr<nopy::PythonFunction> &pythonFunction) {
         ScopedHashTableScope<llvm::StringRef, mlir::Value> varScope(symbolTable);
         builder.setInsertionPointToEnd(theModule.getBody());
         auto location = loc(pythonFunction->loc());
 
         std::vector<mlir::Type> arg_types;
         std::shared_ptr<WorldLocalVar> world_var = nullptr;
-        for(std::shared_ptr<paic2::ParamNode> p : pythonFunction->getArgs()){
+        for(std::shared_ptr<nopy::ParamNode> p : pythonFunction->getArgs()){
             auto py_type = p->getType();
-            if(auto desc = dynamic_cast<paic2::WorldType*>(py_type.get())) {
+            if(auto desc = dynamic_cast<nopy::WorldType*>(py_type.get())) {
                 world_var = std::make_shared<WorldLocalVar>(p->loc(), p->getPyName(), worldTypeFromDesc(desc));
             } else {
                 auto type = getType(p->getType());
@@ -355,28 +348,13 @@ private:
     }
 };
 
-void paic2::MLIRBuilder::bind(py::module &m) {
-    py::class_<paic2::WorldSpec>(m, "WorldSpec")
-            .def(py::init())
-            .def("set_print_name", &WorldSpec::set_print_name)
-            .def("set_world_size", &WorldSpec::set_world_size)
-            .def("set_world_name", &WorldSpec::set_world_name);
+nopy::NoPyMLIRBuilder::NoPyMLIRBuilder() {}
 
-    py::class_<MLIRBuilder>(m, "MLIRBuilder")
-            .def(py::init<py::object>(), py::arg("context") = py::none())
-            .def("print_func_name", &MLIRBuilder::print_func_name)
-            .def("infer", &MLIRBuilder::infer)
-            .def("evaluate", &MLIRBuilder::evaluate);
-    bind_vector<float>(m, "Tensor", true);
-}
-
-paic2::MLIRBuilder::MLIRBuilder(pybind11::object contextObj) {}
-
-std::shared_ptr<mlir::ExecutionEngine> execution_engine_for_function(std::shared_ptr<paic2::PythonFunction> function, paic2::WorldSpec const& worldClassSpec) {
+std::shared_ptr<mlir::ExecutionEngine> execution_engine_for_function(std::shared_ptr<nopy::PythonFunction> function, nopy::WorldSpec const& worldClassSpec) {
     // transform python to MLIR
     std::string function_name = function->getName().data();
-    std::vector<std::shared_ptr<paic2::PythonFunction>> functions{ function };
-    std::shared_ptr<paic2::PythonModule> py_module = std::make_shared<paic2::PythonModule>(functions);
+    std::vector<std::shared_ptr<nopy::PythonFunction>> functions{ function };
+    std::shared_ptr<nopy::PythonModule> py_module = std::make_shared<nopy::PythonModule>(functions);
     ::mlir::MLIRContext *context = new ::mlir::MLIRContext();
     context->loadDialect<mlir::func::FuncDialect>();
     context->loadDialect<mlir::bm::BMDialect>();
@@ -418,18 +396,18 @@ std::shared_ptr<mlir::ExecutionEngine> execution_engine_for_function(std::shared
     return ptr;
 }
 
-void paic2::MLIRBuilder::print_func_name(std::shared_ptr<paic2::PythonFunction> function) {
-    paic2::WorldSpec spec;
+void nopy::NoPyMLIRBuilder::print_func_name(std::shared_ptr<nopy::PythonFunction> function) {
+    nopy::WorldSpec spec;
     spec.set_print_name("print");
     auto engine = execution_engine_for_function(function, spec);
 }
 
-void paic2::MLIRBuilder::infer(std::shared_ptr<paic2::PythonFunction> function, paic2::WorldSpec const& worldClassSpec, std::shared_ptr<std::vector<float>> init_nodes) {
+void nopy::NoPyMLIRBuilder::infer(std::shared_ptr<nopy::PythonFunction> function, nopy::WorldSpec const& worldClassSpec, std::shared_ptr<std::vector<double>> init_nodes) {
     // Invoke the JIT-compiled function.
-    WorldSpec spec(worldClassSpec);
+    nopy::WorldSpec spec(worldClassSpec);
     spec.init_data = init_nodes;
     auto engine = execution_engine_for_function(function, spec);
-    float *data = new float[worldClassSpec.world_size()];
+    double *data = new double[worldClassSpec.world_size()];
     for(int i=0;i<worldClassSpec.world_size();i++){
         float a = init_nodes->at(i);
         data[i] = a;
@@ -439,18 +417,5 @@ void paic2::MLIRBuilder::infer(std::shared_ptr<paic2::PythonFunction> function, 
     if (invocationResult) {
         llvm::errs() << "JIT invocation failed\n";
     }
-}
-
-pybind11::float_ paic2::MLIRBuilder::evaluate(std::shared_ptr<paic2::PythonFunction> function, pybind11::float_ input) {
-    paic2::WorldSpec spec;
-    auto engine = execution_engine_for_function(function, spec);
-
-    // Invoke the JIT-compiled function.
-    float res = 0;
-    auto invocationResult = engine->invoke(function->getName(), input.operator float(), mlir::ExecutionEngine::result(res));
-    if (invocationResult) {
-        llvm::errs() << "JIT invocation failed\n";
-        throw 0;
-    }
-    return pybind11::float_(res);
+    delete []data;
 }

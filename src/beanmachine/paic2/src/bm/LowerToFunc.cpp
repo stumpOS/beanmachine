@@ -15,6 +15,21 @@
 #include <iostream>
 
 using namespace mlir;
+// MemRef Helper functions
+static MemRefType convertTensorToMemRef(TensorType type) {
+    assert(type.hasRank() && "expected only ranked shapes");
+    return MemRefType::get(type.getShape(), type.getElementType());
+}
+
+static Value insertAllocAndDealloc(MemRefType type, Location loc,
+                                   PatternRewriter &rewriter) {
+    auto alloc = rewriter.create<memref::AllocOp>(loc, type);
+    auto *parentBlock = alloc->getBlock();
+    alloc->moveBefore(&parentBlock->front());
+    auto dealloc = rewriter.create<memref::DeallocOp>(loc, alloc);
+    dealloc->moveBefore(&parentBlock->back());
+    return alloc;
+}
 //===----------------------------------------------------------------------===//
 // BMToFunc RewritePatterns: Return operations
 //===----------------------------------------------------------------------===//
@@ -46,6 +61,80 @@ struct PrintOpLowering : public OpConversionPattern<bm::PrintWorldOp> {
         // We don't lower "bm.print_world" in this pass, but we need to update its
         // operands.
         rewriter.updateRootInPlace(op,[&] { op->setOperands(adaptor.getOperands()); });
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
+// BMToAffine RewritePatterns: Constant operations
+//===----------------------------------------------------------------------===//
+
+struct WorldConstantOpLowering : public OpRewritePattern<mlir::bm::WorldConstantOp> {
+    using OpRewritePattern<mlir::bm::WorldConstantOp>::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(mlir::bm::WorldConstantOp op,
+                                  PatternRewriter &rewriter) const final {
+        ArrayAttr arrayAttr = op.getValue();
+        if(arrayAttr.size() != 1){
+            return failure();
+        }
+        DenseElementsAttr constantValue = arrayAttr.begin()->dyn_cast_or_null<DenseElementsAttr>();
+        Location loc = op.getLoc();
+
+        // When lowering the constant operation, we allocate and assign the constant
+        // values to a corresponding memref allocation.
+        auto worldType = op.getType().cast<bm::WorldType>();
+        auto tensorType = worldType.getElementTypes().front();
+        auto memRefType = convertTensorToMemRef(tensorType.cast<TensorType>());
+        auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
+
+        // We will be generating constant indices up-to the largest dimension.
+        // Create these constants up-front to avoid large amounts of redundant
+        // operations.
+        auto valueShape = memRefType.getShape();
+        SmallVector<Value, 8> constantIndices;
+
+        if (!valueShape.empty()) {
+            for (auto i : llvm::seq<int64_t>(
+                    0, *std::max_element(valueShape.begin(), valueShape.end())))
+                constantIndices.push_back(
+                        rewriter.create<arith::ConstantIndexOp>(loc, i));
+        } else {
+            // This is the case of a tensor of rank 0.
+            constantIndices.push_back(
+                    rewriter.create<arith::ConstantIndexOp>(loc, 0));
+        }
+
+        // The constant operation represents a multi-dimensional constant, so we
+        // will need to generate a store for each of the elements. The following
+        // functor recursively walks the dimensions of the constant shape,
+        // generating a store when the recursion hits the base case.
+        SmallVector<Value, 2> indices;
+        auto valueIt = constantValue.value_begin<FloatAttr>();
+        std::function<void(uint64_t)> storeElements = [&](uint64_t dimension) {
+            // The last dimension is the base case of the recursion, at this point
+            // we store the element at the given index.
+            if (dimension == valueShape.size()) {
+                rewriter.create<AffineStoreOp>(
+                        loc, rewriter.create<arith::ConstantOp>(loc, *valueIt++), alloc,
+                        llvm::makeArrayRef(indices));
+                return;
+            }
+
+            // Otherwise, iterate over the current dimension and add the indices to
+            // the list.
+            for (uint64_t i = 0, e = valueShape[dimension]; i != e; ++i) {
+                indices.push_back(constantIndices[i]);
+                storeElements(dimension + 1);
+                indices.pop_back();
+            }
+        };
+
+        // Start the element storing recursion from the first dimension.
+        storeElements(/*dimension=*/0);
+
+        // Replace this operation with the generated alloc.
+        rewriter.replaceOp(op, alloc);
         return success();
     }
 };
@@ -127,7 +216,7 @@ void BMToFuncLoweringPass::runOnOperation() {
     // Now that the conversion target has been defined, we just need to provide
     // the set of patterns that will lower the Toy operations.
     RewritePatternSet patterns(&getContext());
-    patterns.add<FuncOpLowering, PrintOpLowering, ReturnOpLowering>(&getContext());
+    patterns.add<FuncOpLowering, PrintOpLowering, ReturnOpLowering, WorldConstantOpLowering>(&getContext());
 
     // With the target and rewrite patterns defined, we can now attempt the
     // conversion. The conversion will signal failure if any of our `illegal`

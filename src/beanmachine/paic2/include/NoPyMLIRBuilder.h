@@ -1,15 +1,15 @@
 //
-// Created by Steffi Stumpos on 7/19/22.
+// Created by Steffi Stumpos on 7/25/22.
 //
 
-#ifndef PAIC2_WORLDSPEC_H
-#define PAIC2_WORLDSPEC_H
-#include <string>
+#ifndef PAIC2_NOPYMLIRBUILDER_H
+#define PAIC2_NOPYMLIRBUILDER_H
+#include "mlir-c/IR.h"
+#include "NoPyPaicAST.h"
+#include <vector>
+using Tensor = std::vector<float, std::allocator<float>>;
 
-namespace paic2 {
-
-    // The compiler knows that the world has certain members and the layout of those members, it just doesn't know what those
-    // members are called. This is the configuration for the world fields.
+namespace nopy {
     class WorldSpec {
     public:
         WorldSpec():_world_size(0){ init_data = nullptr; }
@@ -27,12 +27,17 @@ namespace paic2 {
         std::string world_name()const{return _world_name;}
         int world_size()const{return _world_size; }
 
-        std::shared_ptr<std::vector<float>> init_data;
+        std::shared_ptr<std::vector<double>> init_data;
     private:
         std::string _print_name;
         std::string _world_name;
         int _world_size;
     };
+    class NoPyMLIRBuilder {
+    public:
+        NoPyMLIRBuilder();
+        void print_func_name(std::shared_ptr<nopy::PythonFunction> function);
+        void infer(std::shared_ptr<nopy::PythonFunction> function, WorldSpec const& worldClassSpec, std::shared_ptr<std::vector<double>> init_nodes);
+    };
 }
-
-#endif //PAIC2_WORLDSPEC_H
+#endif //PAIC2_NOPYMLIRBUILDER_H
