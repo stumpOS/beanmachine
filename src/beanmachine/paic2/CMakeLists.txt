@@ -2,13 +2,17 @@ cmake_minimum_required(VERSION 3.22)
 project(PAIC2 LANGUAGES CXX C)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_VERBOSE_MAKEFILE on )
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+set(LLVM_REQUIRES_EH ON)
+set(LLVM_REQUIRES_RTTI ON)
+
 
 find_package(MLIR REQUIRED CONFIG)
-
-# pybind11
 add_subdirectory(${BM_ROOT}/src/beanmachine/paic2/externals/pybind11)
+
+message(STATUS "BM_ROOT: ${BM_ROOT}")
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
@@ -33,19 +37,42 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 # library
-add_llvm_library(PAIC2_LIB src/MLIRBuilder.cpp src/PaicAST.cpp)
-target_compile_options (PAIC2_LIB PUBLIC -fexceptions)
-target_compile_options (PAIC2_LIB PUBLIC -frtti)
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
-set(LIBS ${dialect_libs} ${conversion_libs})
-target_link_libraries(PAIC2_LIB PRIVATE ${LIBS})
+add_mlir_library(PAIC2_LIB
+        src/MLIRBuilder.cpp
+        src/PaicAST.cpp
+        src/bm/dialect.cpp
+        src/bm/LowerToLLVM.cpp
+        src/bm/LowerToFunc.cpp
 
-add_subdirectory(include)
-add_subdirectory(src)
+        DEPENDS
+        bm_dialect
 
-target_link_libraries(PAIC2_LIB
-        PRIVATE
+        LINK_COMPONENTS
+        Core
+        CodeGen
+        AsmPrinter
+        Analysis
+        IRReader
+#        OrcTargetProcess
+#        OrcShared
+#        TransformUtils
+#        X86AsmParser
+#        X86CodeGen
+        Support
+        nativecodegen
+        OrcJIT
+        Target
+        JITLink
+        ExecutionEngine
+
+        LINK_LIBS PUBLIC
+        ${dialect_libs}
+        ${conversion_libs}
+        MLIRIR
+        MLIRSupport
+
         MLIRAnalysis
         MLIRCallInterfaces
         MLIRCastInterfaces
@@ -56,14 +83,23 @@ target_link_libraries(PAIC2_LIB
         MLIRLLVMDialect
         MLIRLLVMIRTransforms
         MLIRLLVMToLLVMIRTranslation
-        MLIRMemRefDialect
         MLIRParser
         MLIRPass
         MLIRSideEffectInterfaces
         MLIRSupport
         MLIRTargetLLVMIRExport
         MLIRTransforms
+        MLIRJitRunner
         )
+
+#target_compile_options (PAIC2_LIB PUBLIC -fexceptions)
+#target_compile_options (PAIC2_LIB PUBLIC -frtti)
+#set(LIBS ${dialect_libs} ${conversion_libs})
+#target_link_libraries(PAIC2_LIB PRIVATE ${LIBS})
+
+# pybind11
+add_subdirectory(include)
+add_subdirectory(src)
 
 # pybind module
 set(CMAKE_CXX_FLAGS "-g -O0")
