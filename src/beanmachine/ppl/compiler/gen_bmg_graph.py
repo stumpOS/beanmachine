@@ -134,7 +134,8 @@ class GeneratedGraph:
             self._add_constant(node)
 
     def _generate_graph(self, skip_optimizations: Set[str]) -> None:
-        fix_problems(self.bmg, skip_optimizations).raise_errors()
+        b, e = fix_problems(self.bmg, skip_optimizations)
+        e.raise_errors()
         self.bmg._begin(prof.build_bmg_graph)
         for node in self.bmg.all_ancestor_nodes():
             self._generate_node(node)

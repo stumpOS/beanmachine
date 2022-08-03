@@ -186,6 +186,10 @@ def _broadcast(*sizes: Size) -> Size:
     #
     # We often need to answer the question "given n sizes, what is the size of the broadcast
     # of all n sizes?" This method does that computation.
+    # if len(sizes) == 1:
+    #     return sizes[0]
+    # if len(sizes) == 0:
+    #     return Size([])
     return reduce(_broadcast_two, sizes)
 
 

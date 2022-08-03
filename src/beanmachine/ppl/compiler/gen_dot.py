@@ -21,7 +21,7 @@ from beanmachine.ppl.utils.dotbuilder import DotBuilder
 
 
 def to_dot(
-    bmg: BMGraphBuilder,
+    bmg_old: BMGraphBuilder,
     node_types: bool = False,
     node_sizes: bool = False,
     edge_requirements: bool = False,
@@ -48,10 +48,11 @@ def to_dot(
         #
         # * Add a whole_graph flag, default to true, which decides
         #   whether to graph the whole thing or not.
-        fix_problems(bmg, skip_optimizations).raise_errors()
-        node_list = bmg.all_ancestor_nodes()
+        bmg_opt, error = fix_problems(bmg_old, skip_optimizations)
+        error.raise_errors()
+        node_list = bmg_opt.all_ancestor_nodes()
     else:
-        node_list = bmg.all_nodes()
+        node_list = bmg_old.all_nodes()
 
     nodes = {}
     for index, node in enumerate(node_list):
