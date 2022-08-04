@@ -26,11 +26,22 @@ from beanmachine.ppl.compiler.sizer import is_scalar, Sizer
 from beanmachine.ppl.compiler.support import _prod
 from torch import Size, tensor
 
+_consumes_tensor_types = [
+    bn.SumNode,
+    bn.Query,
+    bn.CholeskyNode,
+    bn.ColumnIndexNode,
+    bn.IndexNode,
+    bn.LogSumExpNode,
+    bn.MatrixMultiplicationNode,
+    bn.ToRealMatrixNode,
+    bn.TransposeNode,
+]
+
 _indexable_node_types = [
     bn.ColumnIndexNode,
     bn.ConstantTensorNode,
     bn.IndexNode,
-    bn.MatrixMultiplicationNode,
     bn.MatrixScaleNode,
     bn.SampleNode,
     bn.TensorNode,
@@ -38,8 +49,19 @@ _indexable_node_types = [
     bn.UntypedConstantNode,
 ]
 
+# nodes in this category accept a single value argument
+def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
+    return {
+        bn.NaturalNode: bmg.add_natural,
+        bn.ConstantNode: bmg.add_constant,
+        bn.RealNode: bmg.add_real,
+        bn.PositiveRealNode: bmg.add_pos_real,
+        bn.ConstantTensorNode: bmg.add_constant_tensor,
+        bn.UntypedConstantNode: bmg.add_constant,
+    }
 
-def _operator_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
+
+def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     return {
         # Note that we expect devectorization to run *before* multiary
         # addition/multiplication rewriting, so we can assume that
@@ -48,24 +70,36 @@ def _operator_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.BitAndNode: bmg.add_bitand,
         bn.BitOrNode: bmg.add_bitor,
         bn.BitXorNode: bmg.add_bitxor,
+        bn.CholeskyNode: bmg.add_cholesky,
+        bn.ColumnIndexNode: bmg.add_column_index,
         bn.DivisionNode: bmg.add_division,
         bn.EqualNode: bmg.add_equal,
         bn.Exp2Node: bmg.add_exp2,
         bn.ExpNode: bmg.add_exp,
         bn.ExpM1Node: bmg.add_expm1,
+        bn.ItemNode: bmg.add_item,
+        bn.IndexNode: bmg.add_index,
         bn.LogAddExpNode: bmg.add_logaddexp,
         bn.LogisticNode: bmg.add_logistic,
         bn.Log10Node: bmg.add_log10,
         bn.Log1pNode: bmg.add_log1p,
         bn.Log2Node: bmg.add_log2,
         bn.Log1mexpNode: bmg.add_log1mexp,
+        bn.LogSumExpVectorNode: bmg.add_logsumexp_vector,
         bn.LogProbNode: bmg.add_log_prob,
         bn.LogNode: bmg.add_log,
+        bn.LogSumExpTorchNode: bmg.add_logsumexp_torch,
+        bn.MatrixMultiplicationNode: bmg.add_matrix_multiplication,
         bn.MultiplicationNode: bmg.add_multiplication,
         bn.NegateNode: bmg.add_negate,
         bn.PhiNode: bmg.add_phi,
         bn.PowerNode: bmg.add_power,
         bn.SquareRootNode: bmg.add_squareroot,
+        bn.ToMatrixNode: bmg.add_to_matrix,
+        bn.ToPositiveRealMatrixNode: bmg.add_to_positive_real_matrix,
+        bn.ToRealMatrixNode: bmg.add_to_real_matrix,
+        bn.TransposeNode: bmg.add_transpose,
+        bn.ToRealNode: bmg.add_to_real,
     }
 
 
@@ -84,6 +118,7 @@ def _distribution_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.BinomialNode: bmg.add_binomial,
         bn.BinomialLogitNode: bmg.add_binomial_logit,
         bn.Chi2Node: bmg.add_chi2,
+        bn.DirichletNode: bmg.add_dirichlet,
         bn.GammaNode: bmg.add_gamma,
         bn.HalfCauchyNode: bmg.add_halfcauchy,
         bn.HalfNormalNode: bmg.add_halfnormal,
@@ -101,7 +136,8 @@ class BuilderContext:
     def __init__(self, bmg: BMGraphBuilder):
         self.bmg = bmg
         self.dist_factories = _distribution_factories(bmg)
-        self.op_factories = _operator_factories(bmg)
+        self.op_factories = _node_factories(bmg)
+        self.value_factories = _constant_factories(bmg)
         self.devectorized_nodes: Dict[bn.BMGNode, DevectorizedNode] = {}
         self.clones: Dict[bn.BMGNode, bn.BMGNode] = {}
 
@@ -115,8 +151,10 @@ def _is_fixable_size(s: Size) -> bool:
     return False
 
 
-def needs_devectorize(node: bn.BMGNode, size: Size) -> bool:
-    return _is_fixable_size(size) and not isinstance(node, bn.Query)
+def _needs_devectorize(node: bn.BMGNode, size: Size) -> bool:
+    return _is_fixable_size(size) and not _consumes_tensor_types.__contains__(
+        type(node)
+    )
 
 
 def _node_to_index_list(
@@ -222,12 +260,16 @@ def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext) -> bn.BMGNode:
         return cxt.bmg.add_tensor(size, *parents)
     if isinstance(node, bn.Observation):
         return cxt.bmg.add_observation(parents[0], node.value)
-    if isinstance(node, bn.UntypedConstantNode):
-        return cxt.bmg.add_constant(node.value)
-    if isinstance(node, bn.ConstantTensorNode):
-        return cxt.bmg.add_constant_tensor(node.value)
+    if cxt.value_factories.__contains__(type(node)):
+        return cxt.value_factories[type(node)](node.value)
+    # if isinstance(node, bn.UntypedConstantNode):
+    #     return cxt.bmg.add_constant(node.value)
+    # if isinstance(node, bn.ConstantTensorNode):
+    #     return cxt.bmg.add_constant_tensor(node.value)
+    # if isinstance(node, bn.NaturalNode):
+    #     return cxt.bmg.add_natural(node.value)
     else:
-        raise NotImplementedError()
+        raise NotImplementedError(type(node))
 
 
 def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode:
@@ -299,7 +341,7 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
         cxt = BuilderContext(bmg)
         for node in bmg_old.all_nodes():
             size: Size = sizer[node]
-            if needs_devectorize(node, size):
+            if _needs_devectorize(node, size):
                 cxt.devectorized_nodes[node] = split(node, cxt, size)
             else:
                 cxt.clones[node] = _clone(node, size, cxt)
