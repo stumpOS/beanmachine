@@ -52,10 +52,12 @@ _indexable_node_types = [
 # nodes in this category accept a single value argument
 def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     return {
+        bn.NegativeRealNode: bmg.add_neg_real,
         bn.NaturalNode: bmg.add_natural,
         bn.ConstantNode: bmg.add_constant,
         bn.RealNode: bmg.add_real,
         bn.PositiveRealNode: bmg.add_pos_real,
+        bn.ProbabilityNode: bmg.add_probability,
         bn.ConstantTensorNode: bmg.add_constant_tensor,
         bn.UntypedConstantNode: bmg.add_constant,
     }
@@ -72,6 +74,7 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.BitXorNode: bmg.add_bitxor,
         bn.CholeskyNode: bmg.add_cholesky,
         bn.ColumnIndexNode: bmg.add_column_index,
+        bn.ComplementNode: bmg.add_complement,
         bn.DivisionNode: bmg.add_division,
         bn.EqualNode: bmg.add_equal,
         bn.Exp2Node: bmg.add_exp2,
@@ -95,10 +98,13 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.PhiNode: bmg.add_phi,
         bn.PowerNode: bmg.add_power,
         bn.SquareRootNode: bmg.add_squareroot,
+        bn.SwitchNode: bmg.add_switch,
+        bn.SumNode: bmg.add_sum,
         bn.ToMatrixNode: bmg.add_to_matrix,
         bn.ToPositiveRealMatrixNode: bmg.add_to_positive_real_matrix,
         bn.ToRealMatrixNode: bmg.add_to_real_matrix,
         bn.TransposeNode: bmg.add_transpose,
+        bn.ToPositiveRealNode: bmg.add_to_positive_real,
         bn.ToRealNode: bmg.add_to_real,
     }
 
@@ -117,6 +123,8 @@ def _distribution_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.BetaNode: bmg.add_beta,
         bn.BinomialNode: bmg.add_binomial,
         bn.BinomialLogitNode: bmg.add_binomial_logit,
+        bn.CategoricalNode: bmg.add_categorical,
+        bn.CategoricalLogitNode: bmg.add_categorical_logit,
         bn.Chi2Node: bmg.add_chi2,
         bn.DirichletNode: bmg.add_dirichlet,
         bn.GammaNode: bmg.add_gamma,
@@ -133,11 +141,12 @@ _distribution_types = list(_distribution_factories(BMGraphBuilder()).keys())
 
 
 class BuilderContext:
-    def __init__(self, bmg: BMGraphBuilder):
-        self.bmg = bmg
-        self.dist_factories = _distribution_factories(bmg)
-        self.op_factories = _node_factories(bmg)
-        self.value_factories = _constant_factories(bmg)
+    def __init__(self, bmg_original: BMGraphBuilder):
+        self.original_context = bmg_original.execution_context
+        self.bmg = BMGraphBuilder()
+        self.dist_factories = _distribution_factories(self.bmg)
+        self.node_factories = _node_factories(self.bmg)
+        self.value_factories = _constant_factories(self.bmg)
         self.devectorized_nodes: Dict[bn.BMGNode, DevectorizedNode] = {}
         self.clones: Dict[bn.BMGNode, bn.BMGNode] = {}
 
@@ -249,27 +258,25 @@ def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext) -> bn.BMGNode:
     if isinstance(node, bn.SampleNode):
         dist = parents[0]
         assert isinstance(dist, bn.DistributionNode)
-        return cxt.bmg.add_sample(operand=dist)
-    if isinstance(node, bn.DistributionNode):
-        return cxt.dist_factories[type(node)](*parents)
-    if isinstance(node, bn.Query):
-        return cxt.bmg.add_query(parents[0])
-    if isinstance(node, bn.OperatorNode):
-        return cxt.op_factories[type(node)](*parents)
-    if isinstance(node, bn.TensorNode):
-        return cxt.bmg.add_tensor(size, *parents)
-    if isinstance(node, bn.Observation):
-        return cxt.bmg.add_observation(parents[0], node.value)
-    if cxt.value_factories.__contains__(type(node)):
-        return cxt.value_factories[type(node)](node.value)
-    # if isinstance(node, bn.UntypedConstantNode):
-    #     return cxt.bmg.add_constant(node.value)
-    # if isinstance(node, bn.ConstantTensorNode):
-    #     return cxt.bmg.add_constant_tensor(node.value)
-    # if isinstance(node, bn.NaturalNode):
-    #     return cxt.bmg.add_natural(node.value)
+        new_node = cxt.bmg.add_sample(operand=dist)
+    elif isinstance(node, bn.DistributionNode):
+        new_node = cxt.dist_factories[type(node)](*parents)
+    elif isinstance(node, bn.Query):
+        new_node = cxt.bmg.add_query(parents[0])
+    elif isinstance(node, bn.TensorNode):
+        new_node = cxt.bmg.add_tensor(size, *parents)
+    elif isinstance(node, bn.Observation):
+        new_node = cxt.bmg.add_observation(parents[0], node.value)
+    elif cxt.value_factories.__contains__(type(node)):
+        new_node = cxt.value_factories[type(node)](node.value)
+    elif cxt.node_factories.__contains__(type(node)):
+        new_node = cxt.node_factories[type(node)](*parents)
     else:
         raise NotImplementedError(type(node))
+    locations = cxt.original_context.node_locations(node)
+    for site in locations:
+        cxt.bmg.execution_context.record_node_call(new_node, site)
+    return new_node
 
 
 def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode:
@@ -307,7 +314,7 @@ def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode
         )
     if isinstance(node, bn.OperatorNode):
         return DevectorizedNode(
-            list_from_parents(item_count, parents, cxt.op_factories[type(node)]), size
+            list_from_parents(item_count, parents, cxt.node_factories[type(node)]), size
         )
     if isinstance(node, bn.Observation):
         # TODO: What if the observation is of a different size than the
@@ -336,9 +343,8 @@ def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode
 
 def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
     def vobs_fixer(bmg_old: BMGraphBuilder) -> GraphFixerResult:
-        bmg = BMGraphBuilder()
         # clone with splits
-        cxt = BuilderContext(bmg)
+        cxt = BuilderContext(bmg_old)
         for node in bmg_old.all_nodes():
             size: Size = sizer[node]
             if _needs_devectorize(node, size):
@@ -347,7 +353,7 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
                 cxt.clones[node] = _clone(node, size, cxt)
         split_nodes_cnt = len(cxt.devectorized_nodes)
         if split_nodes_cnt > 0:
-            return bmg, True, ErrorReport()
+            return cxt.bmg, True, ErrorReport()
         else:
             return bmg_old, False, ErrorReport()
 
