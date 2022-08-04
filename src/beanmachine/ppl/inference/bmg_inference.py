@@ -46,6 +46,7 @@ class BMGInference:
     is currently limited.
     """
 
+    _devectorize: bool = True
     _fix_observe_true: bool = False
     _pd: Optional[prof.ProfilerData] = None
 
@@ -73,6 +74,7 @@ class BMGInference:
         bmg = rt.accumulate_graph(queries, observations)
         # TODO: Figure out a better way to pass this flag around
         bmg._fix_observe_true = self._fix_observe_true
+        bmg._devectorize = self._devectorize
         return rt
 
     def _transpose_samples(self, raw):

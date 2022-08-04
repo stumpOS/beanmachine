@@ -65,6 +65,8 @@ class BMGraphBuilder:
 
     _fix_observe_true: bool = False
 
+    _devectorize: bool = True
+
     _pd: Optional[prof.ProfilerData]
 
     execution_context: ExecutionContext

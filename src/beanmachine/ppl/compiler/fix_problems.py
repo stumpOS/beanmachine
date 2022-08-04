@@ -53,8 +53,8 @@ from beanmachine.ppl.compiler.fix_unsupported import (
     unsupported_node_reporter,
     untypable_node_reporter,
 )
-from beanmachine.ppl.compiler.fix_vectorized_models import vectorized_model_fixer
 from beanmachine.ppl.compiler.lattice_typer import LatticeTyper
+from beanmachine.ppl.compiler.tests.fix_vectors import vectorized_graph_fixer
 
 
 default_skip_optimizations: Set[str] = {
@@ -119,7 +119,9 @@ def fix_problems(
 
     all_fixers = sequential_graph_fixer(
         [
-            beanmachine.ppl.compiler.tests.fix_vectors.vectorized_graph_fixer(),
+            conditional_graph_fixer(
+                condition=lambda gb: gb._devectorize, fixer=vectorized_graph_fixer()
+            ),
             arithmetic_graph_fixer(skip_optimizations),
             unsupported_node_reporter(),
             bad_matmul_reporter(),

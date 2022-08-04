@@ -38,13 +38,18 @@ _indexable_node_types = [
     bn.UntypedConstantNode,
 ]
 
+
 def _operator_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     return {
         # Note that we expect devectorization to run *before* multiary
         # addition/multiplication rewriting, so we can assume that
         # all additions and multiplications are binary.
         bn.AdditionNode: bmg.add_addition,
+        bn.BitAndNode: bmg.add_bitand,
+        bn.BitOrNode: bmg.add_bitor,
+        bn.BitXorNode: bmg.add_bitxor,
         bn.DivisionNode: bmg.add_division,
+        bn.EqualNode: bmg.add_equal,
         bn.Exp2Node: bmg.add_exp2,
         bn.ExpNode: bmg.add_exp,
         bn.ExpM1Node: bmg.add_expm1,
@@ -62,6 +67,7 @@ def _operator_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.PowerNode: bmg.add_power,
         bn.SquareRootNode: bmg.add_squareroot,
     }
+
 
 def _distribution_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     # These are all the distributions that we know how to devectorize,
@@ -90,13 +96,15 @@ def _distribution_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
 
 _distribution_types = list(_distribution_factories(BMGraphBuilder()).keys())
 
+
 class BuilderContext:
-    def __init__(self, bmg:BMGraphBuilder):
+    def __init__(self, bmg: BMGraphBuilder):
         self.bmg = bmg
         self.dist_factories = _distribution_factories(bmg)
         self.op_factories = _operator_factories(bmg)
-        self.devectorized_nodes:Dict[bn.BMGNode, DevectorizedNode] = {}
-        self.clones:Dict[bn.BMGNode, bn.BMGNode] = {}
+        self.devectorized_nodes: Dict[bn.BMGNode, DevectorizedNode] = {}
+        self.clones: Dict[bn.BMGNode, bn.BMGNode] = {}
+
 
 def _is_fixable_size(s: Size) -> bool:
     dim = len(s)
@@ -106,8 +114,10 @@ def _is_fixable_size(s: Size) -> bool:
         return s[0] > 1 or s[1] > 1
     return False
 
-def needs_devectorize(node:bn.BMGNode, size:Size) -> bool:
+
+def needs_devectorize(node: bn.BMGNode, size: Size) -> bool:
     return _is_fixable_size(size) and not isinstance(node, bn.Query)
+
 
 def _node_to_index_list(
     cxt: BuilderContext, size: Size, node: bn.BMGNode
@@ -152,17 +162,22 @@ def _node_to_index_list(
                 index_list.append(nij)
     return index_list
 
+
 class DevectorizedNode:
-    def __init__(self, elements:List[bn.BMGNode], shape:Size):
-        self.elements:List[bn.BMGNode] = elements
+    def __init__(self, elements: List[bn.BMGNode], shape: Size):
+        self.elements: List[bn.BMGNode] = elements
         self.size = shape
 
 
-def list_from_parents(item_count: int, parents: [], creator: Callable) -> List[bn.BMGNode]:
+def list_from_parents(
+    item_count: int, parents: [], creator: Callable
+) -> List[bn.BMGNode]:
     return list_from_parents_with_index(item_count, parents, lambda i, s: creator(*s))
 
 
-def list_from_parents_with_index(item_count: int, parents: [], creator: Callable) -> List[bn.BMGNode]:
+def list_from_parents_with_index(
+    item_count: int, parents: [], creator: Callable
+) -> List[bn.BMGNode]:
     elements: List[bn.BMGNode] = []
     for i in range(0, item_count):
         reduced_parents = []
@@ -176,8 +191,7 @@ def list_from_parents_with_index(item_count: int, parents: [], creator: Callable
     return elements
 
 
-
-def _clone_parents(node: bn.BMGNode, cxt:BuilderContext) -> List[bn.BMGNode]:
+def _clone_parents(node: bn.BMGNode, cxt: BuilderContext) -> List[bn.BMGNode]:
     parents = []
     for p in node.inputs.inputs:
         if cxt.devectorized_nodes.__contains__(p):
@@ -191,7 +205,8 @@ def _clone_parents(node: bn.BMGNode, cxt:BuilderContext) -> List[bn.BMGNode]:
             raise ValueError("encountered a value not in the clone context")
     return parents
 
-def _clone(node: bn.BMGNode, size:Size, cxt:BuilderContext) -> bn.BMGNode:
+
+def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext) -> bn.BMGNode:
     parents = _clone_parents(node, cxt)
     if isinstance(node, bn.SampleNode):
         dist = parents[0]
@@ -209,10 +224,13 @@ def _clone(node: bn.BMGNode, size:Size, cxt:BuilderContext) -> bn.BMGNode:
         return cxt.bmg.add_observation(parents[0], node.value)
     if isinstance(node, bn.UntypedConstantNode):
         return cxt.bmg.add_constant(node.value)
+    if isinstance(node, bn.ConstantTensorNode):
+        return cxt.bmg.add_constant_tensor(node.value)
     else:
         raise NotImplementedError()
 
-def split(node: bn.BMGNode, cxt:BuilderContext, size:Size) -> DevectorizedNode:
+
+def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode:
     item_count = 0
     for i in range(0, len(size)):
         item_count += size[i]
@@ -238,11 +256,17 @@ def split(node: bn.BMGNode, cxt:BuilderContext, size:Size) -> DevectorizedNode:
     if _indexable_node_types.__contains__(type(node)):
         return DevectorizedNode(_node_to_index_list(cxt, size, node), size)
     if isinstance(node, bn.DistributionNode):
-        return DevectorizedNode(list_from_parents(item_count, parents, cxt.dist_factories[type(node)]), size)
+        return DevectorizedNode(
+            list_from_parents(item_count, parents, cxt.dist_factories[type(node)]), size
+        )
     if isinstance(node, bn.Query):
-        return DevectorizedNode(list_from_parents(item_count, parents, cxt.bmg.add_query), size)
+        return DevectorizedNode(
+            list_from_parents(item_count, parents, cxt.bmg.add_query), size
+        )
     if isinstance(node, bn.OperatorNode):
-        return DevectorizedNode(list_from_parents(item_count, parents, cxt.op_factories[type(node)]), size)
+        return DevectorizedNode(
+            list_from_parents(item_count, parents, cxt.op_factories[type(node)]), size
+        )
     if isinstance(node, bn.Observation):
         # TODO: What if the observation is of a different size than the
         # tensor node we've just generated? That should be an error, but instead
@@ -259,10 +283,14 @@ def split(node: bn.BMGNode, cxt:BuilderContext, size:Size) -> DevectorizedNode:
                 for j in range(0, node.value.size()[1]):
                     values.append(node.value[i][j])
         return DevectorizedNode(
-            list_from_parents_with_index(item_count, parents, lambda i, s: cxt.bmg.add_observation(*s, values[i])),
-            size)
+            list_from_parents_with_index(
+                item_count, parents, lambda i, s: cxt.bmg.add_observation(*s, values[i])
+            ),
+            size,
+        )
     else:
         raise NotImplementedError()
+
 
 def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
     def vobs_fixer(bmg_old: BMGraphBuilder) -> GraphFixerResult:
@@ -274,7 +302,7 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
             if needs_devectorize(node, size):
                 cxt.devectorized_nodes[node] = split(node, cxt, size)
             else:
-                cxt.clones[node] = _clone(node,size, cxt)
+                cxt.clones[node] = _clone(node, size, cxt)
         split_nodes_cnt = len(cxt.devectorized_nodes)
         if split_nodes_cnt > 0:
             return bmg, True, ErrorReport()
@@ -282,6 +310,7 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
             return bmg_old, False, ErrorReport()
 
     return vobs_fixer
+
 
 # a graph fixer is a callable that accepts a list and returns a Tuple[bool, ErrorReport]
 def vectorized_graph_fixer() -> GraphFixer:
