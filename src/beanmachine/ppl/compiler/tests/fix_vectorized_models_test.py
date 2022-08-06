@@ -224,6 +224,31 @@ digraph "graph" {
 """
         self.assertEqual(expected.strip(), observed.strip())
 
+    def test_broadcast(self) -> None:
+        # mu is size 1 x 3
+        @bm.random_variable
+        def mu():
+            return Bernoulli(tensor([0.6, 0.3, 0.1]))
+
+        # sigma is size 2 x 3
+        @bm.random_variable
+        def sigma():
+            return StudentT(
+                tensor([[2.0, 3.0, 4.0], [5.0, 8.0, 9.0]]),
+                tensor([[0.2, 0.3, 0.4], [0.5, 0.8, 0.9]]),
+                tensor([[0.2, 0.3, 0.4], [0.5, 0.8, 0.9]]),
+            )
+
+        # what size is bar?
+        @bm.random_variable
+        def bar():
+            return Normal(mu(), sigma())
+
+        observations = {bar(): tensor([[0.92, 0.83, 0.84], [0.75, 0.68, 0.99]])}
+        queries = [bar()]
+        observed = BMGInference().to_dot(queries, observations)
+        self.assertTrue(observed != "")
+
     def test_fix_vectorized_models_1v2(self) -> None:
         self.maxDiff = None
         observations = {flip_beta(): tensor([0.0, 1.0])}
@@ -580,141 +605,141 @@ digraph "graph" {
         observed = BMGInference().to_dot(queries, observations, after_transform=True)
         expected = """
 digraph "graph" {
-  N00[label=3];
-  N01[label=2];
-  N02[label=1.0];
-  N03[label=HalfCauchy];
-  N04[label=Sample];
-  N05[label=0.25];
-  N06[label=Bernoulli];
-  N07[label=Sample];
-  N08[label=ToReal];
-  N09[label=2.0];
-  N10[label=Normal];
+  N00[label=1.0];
+  N01[label=HalfCauchy];
+  N02[label=Sample];
+  N03[label=2.0];
+  N04[label=HalfCauchy];
+  N05[label=Sample];
+  N06[label=3.0];
+  N07[label=HalfCauchy];
+  N08[label=Sample];
+  N09[label=0.25];
+  N10[label=Bernoulli];
   N11[label=Sample];
-  N12[label=StudentT];
-  N13[label=Sample];
-  N14[label=HalfCauchy];
-  N15[label=Sample];
-  N16[label=0.75];
-  N17[label=Bernoulli];
-  N18[label=Sample];
-  N19[label=ToReal];
-  N20[label=3.0];
-  N21[label=Normal];
-  N22[label=Sample];
-  N23[label=StudentT];
-  N24[label=Sample];
-  N25[label=HalfCauchy];
+  N12[label=0.75];
+  N13[label=Bernoulli];
+  N14[label=Sample];
+  N15[label=0.5];
+  N16[label=Bernoulli];
+  N17[label=Sample];
+  N18[label=0.125];
+  N19[label=Bernoulli];
+  N20[label=Sample];
+  N21[label=0.875];
+  N22[label=Bernoulli];
+  N23[label=Sample];
+  N24[label=0.625];
+  N25[label=Bernoulli];
   N26[label=Sample];
-  N27[label=0.5];
-  N28[label=Bernoulli];
+  N27[label=ToReal];
+  N28[label=Normal];
   N29[label=Sample];
   N30[label=ToReal];
-  N31[label=4.0];
-  N32[label=Normal];
-  N33[label=Sample];
-  N34[label=StudentT];
-  N35[label=Sample];
-  N36[label=0.125];
-  N37[label=Bernoulli];
-  N38[label=Sample];
-  N39[label=ToReal];
-  N40[label=Normal];
-  N41[label=Sample];
-  N42[label=StudentT];
-  N43[label=Sample];
-  N44[label=0.875];
-  N45[label=Bernoulli];
-  N46[label=Sample];
-  N47[label=ToReal];
-  N48[label=Normal];
+  N31[label=Normal];
+  N32[label=Sample];
+  N33[label=ToReal];
+  N34[label=4.0];
+  N35[label=Normal];
+  N36[label=Sample];
+  N37[label=ToReal];
+  N38[label=Normal];
+  N39[label=Sample];
+  N40[label=ToReal];
+  N41[label=Normal];
+  N42[label=Sample];
+  N43[label=ToReal];
+  N44[label=Normal];
+  N45[label=Sample];
+  N46[label=StudentT];
+  N47[label=Sample];
+  N48[label=StudentT];
   N49[label=Sample];
   N50[label=StudentT];
   N51[label=Sample];
-  N52[label=0.625];
-  N53[label=Bernoulli];
-  N54[label=Sample];
-  N55[label=ToReal];
-  N56[label=Normal];
+  N52[label=StudentT];
+  N53[label=Sample];
+  N54[label=StudentT];
+  N55[label=Sample];
+  N56[label=StudentT];
   N57[label=Sample];
-  N58[label=StudentT];
-  N59[label=Sample];
+  N58[label=3];
+  N59[label=2];
   N60[label=ToMatrix];
   N61[label=Query];
-  N00 -> N60;
-  N01 -> N60;
-  N02 -> N03;
+  N00 -> N01;
+  N01 -> N02;
+  N02 -> N46;
+  N02 -> N46;
+  N02 -> N52;
+  N02 -> N52;
   N03 -> N04;
-  N04 -> N12;
-  N04 -> N12;
-  N04 -> N42;
-  N04 -> N42;
-  N05 -> N06;
+  N03 -> N28;
+  N03 -> N38;
+  N04 -> N05;
+  N05 -> N48;
+  N05 -> N48;
+  N05 -> N54;
+  N05 -> N54;
   N06 -> N07;
+  N06 -> N31;
+  N06 -> N41;
   N07 -> N08;
-  N08 -> N10;
+  N08 -> N50;
+  N08 -> N50;
+  N08 -> N56;
+  N08 -> N56;
   N09 -> N10;
-  N09 -> N14;
-  N09 -> N40;
   N10 -> N11;
-  N11 -> N12;
+  N11 -> N27;
   N12 -> N13;
-  N13 -> N60;
-  N14 -> N15;
-  N15 -> N23;
-  N15 -> N23;
-  N15 -> N50;
-  N15 -> N50;
+  N13 -> N14;
+  N14 -> N30;
+  N15 -> N16;
   N16 -> N17;
-  N17 -> N18;
+  N17 -> N33;
   N18 -> N19;
-  N19 -> N21;
-  N20 -> N21;
-  N20 -> N25;
-  N20 -> N48;
+  N19 -> N20;
+  N20 -> N37;
   N21 -> N22;
   N22 -> N23;
-  N23 -> N24;
-  N24 -> N60;
+  N23 -> N40;
+  N24 -> N25;
   N25 -> N26;
-  N26 -> N34;
-  N26 -> N34;
-  N26 -> N58;
-  N26 -> N58;
+  N26 -> N43;
   N27 -> N28;
   N28 -> N29;
-  N29 -> N30;
-  N30 -> N32;
+  N29 -> N46;
+  N30 -> N31;
   N31 -> N32;
-  N31 -> N56;
-  N32 -> N33;
-  N33 -> N34;
+  N32 -> N48;
+  N33 -> N35;
   N34 -> N35;
-  N35 -> N60;
-  N36 -> N37;
+  N34 -> N44;
+  N35 -> N36;
+  N36 -> N50;
   N37 -> N38;
   N38 -> N39;
-  N39 -> N40;
+  N39 -> N52;
   N40 -> N41;
   N41 -> N42;
-  N42 -> N43;
-  N43 -> N60;
+  N42 -> N54;
+  N43 -> N44;
   N44 -> N45;
-  N45 -> N46;
+  N45 -> N56;
   N46 -> N47;
-  N47 -> N48;
+  N47 -> N60;
   N48 -> N49;
-  N49 -> N50;
+  N49 -> N60;
   N50 -> N51;
   N51 -> N60;
   N52 -> N53;
-  N53 -> N54;
+  N53 -> N60;
   N54 -> N55;
-  N55 -> N56;
+  N55 -> N60;
   N56 -> N57;
-  N57 -> N58;
-  N58 -> N59;
+  N57 -> N60;
+  N58 -> N60;
   N59 -> N60;
   N60 -> N61;
 }
@@ -1146,13 +1171,40 @@ digraph "graph" {
         self.maxDiff = None
         queries = [normal_log_probs()]
         observations = {}
-        with self.assertRaises(ValueError) as ex:
-            BMGInference().to_dot(queries, observations)
+        observed = BMGInference().to_dot(queries, observations)
         expected = """
-The mu of a normal is required to be a real but is a 2 x 1 natural matrix.
-The normal was created in function call normal_log_probs().
-The value of a log_prob is required to be a real but is a 2 x 1 natural matrix.
-The log_prob was created in function call normal_log_probs().
+digraph "graph" {
+  N00[label=1.0];
+  N01[label=Gamma];
+  N02[label=Sample];
+  N03[label=2];
+  N04[label=1];
+  N05[label=5.0];
+  N06[label=Normal];
+  N07[label=7.0];
+  N08[label=LogProb];
+  N09[label=6.0];
+  N10[label=Normal];
+  N11[label=8.0];
+  N12[label=LogProb];
+  N13[label=ToMatrix];
+  N14[label=Query];
+  N00 -> N01;
+  N00 -> N01;
+  N01 -> N02;
+  N02 -> N06;
+  N02 -> N10;
+  N03 -> N13;
+  N04 -> N13;
+  N05 -> N06;
+  N06 -> N08;
+  N07 -> N08;
+  N08 -> N13;
+  N09 -> N10;
+  N10 -> N12;
+  N11 -> N12;
+  N12 -> N13;
+  N13 -> N14;
+}
         """
-        observed = str(ex.exception)
         self.assertEqual(observed.strip(), expected.strip())

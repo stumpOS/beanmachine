@@ -2,6 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+import math
 import typing
 from typing import Callable, Dict, List, Type
 
@@ -214,23 +215,41 @@ class DevectorizedNode:
     def __init__(self, elements: List[bn.BMGNode], shape: Size):
         self.elements: List[bn.BMGNode] = elements
         self.size = shape
+        item_count = 1
+        for i in range(0, len(self.size)):
+            item_count *= self.size[i]
+        assert item_count == len(elements)
 
 
 def list_from_parents(
-    item_count: int, parents: [], creator: Callable
+    size: Size, item_count: int, parents: [], creator: Callable
 ) -> List[bn.BMGNode]:
-    return list_from_parents_with_index(item_count, parents, lambda i, s: creator(*s))
+    return list_from_parents_with_index(
+        size, item_count, parents, lambda i, s: creator(*s)
+    )
 
 
 def list_from_parents_with_index(
-    item_count: int, parents: [], creator: Callable
+    size: Size, item_count: int, parents: [], creator: Callable
 ) -> List[bn.BMGNode]:
     elements: List[bn.BMGNode] = []
+    broadcast: Dict[DevectorizedNode, Callable] = {}
+    for parent in parents:
+        if isinstance(parent, DevectorizedNode):
+            broadbast_fnc_maybe = broadbast_fnc(parent.size, size)
+            if isinstance(broadbast_fnc_maybe, Callable):
+                broadcast[parent] = broadbast_fnc_maybe
+            else:
+                raise ValueError(
+                    f"The size {parent.size} cannot be broadcast to {size}"
+                )
+
     for i in range(0, item_count):
         reduced_parents = []
         for parent in parents:
             if isinstance(parent, DevectorizedNode):
-                reduced_parents.append(parent.elements[i])
+                new_index = broadcast[parent](i)
+                reduced_parents.append(parent.elements[new_index])
             else:
                 reduced_parents.append(parent)
         new_node = creator(i, reduced_parents)
@@ -279,20 +298,83 @@ def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext) -> bn.BMGNode:
     return new_node
 
 
+identity_fnc = lambda a: a
+
+
+def broadbast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Callable]:
+    if input_size == target_size:
+        return identity_fnc
+
+    # check if input can be broadcast to target and create input project size
+    input_project_size = []
+    if len(input_size) < len(target_size):
+        ones_to_add = len(target_size) - len(input_size)
+        for _ in range(0, ones_to_add):
+            input_project_size.append(1)
+        for dim in input_size:
+            input_project_size.append(dim)
+
+    for i in range(0, len(target_size)):
+        if input_project_size[i] != 1 and target_size[i] != input_project_size[i]:
+            return False
+
+    group_size = []
+    current = 1
+    L = len(target_size)
+    for k in range(0, L).__reversed__():
+        d = target_size[k]
+        group_size.append(current)
+        current = current * d
+
+    def target_index_to_composite(ti: int) -> List:
+        index_list = []
+        current_index = ti
+        j = len(target_size) - 1
+        for _ in target_size:
+            next_index = math.floor(current_index / group_size[j])
+            index_list.append(next_index)
+            current_index = current_index % group_size[j]
+            j = j - 1
+        return index_list
+
+    product_list = []
+    current = 1
+    for d in target_size:
+        product_list.append(current)
+        current = current * d
+    # given a composite index of target, compute a global index of input
+    def input_list_from_target_list(target_list: List[int]) -> int:
+        i = 0
+        j = len(product_list) - 1
+        index = 0
+        for inx in target_list:
+            if input_project_size[i] == 1:
+                i = i + 1
+                j = j - 1
+                continue
+            else:
+                next = inx * product_list[j]
+                index = index + next
+            j = j - 1
+            i = i + 1
+        return index
+
+    return lambda target_index: input_list_from_target_list(
+        target_index_to_composite(target_index)
+    )
+
+
 def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode:
-    item_count = 0
+    item_count = 1
     for i in range(0, len(size)):
-        item_count += size[i]
+        item_count *= size[i]
 
     # identify parents
     parents = []
     for input in node.inputs.inputs:
         if cxt.devectorized_nodes.__contains__(input):
             devectorized_parent = cxt.devectorized_nodes[input]
-            if devectorized_parent.size == size:
-                parents.append(devectorized_parent)
-            else:
-                raise NotImplementedError("broadcasting not supported yet")
+            parents.append(devectorized_parent)
         elif cxt.clones.__contains__(input):
             parents.append(cxt.clones[input])
         else:
@@ -300,21 +382,27 @@ def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode
 
     # create devectorized node from parents
     if isinstance(node, bn.SampleNode):
-        new_nodes = list_from_parents(item_count, parents, cxt.bmg.add_sample)
+        new_nodes = list_from_parents(size, item_count, parents, cxt.bmg.add_sample)
         return DevectorizedNode(new_nodes, size)
     if _indexable_node_types.__contains__(type(node)):
         return DevectorizedNode(_node_to_index_list(cxt, size, node), size)
     if isinstance(node, bn.DistributionNode):
         return DevectorizedNode(
-            list_from_parents(item_count, parents, cxt.dist_factories[type(node)]), size
+            list_from_parents(
+                size, item_count, parents, cxt.dist_factories[type(node)]
+            ),
+            size,
         )
     if isinstance(node, bn.Query):
         return DevectorizedNode(
-            list_from_parents(item_count, parents, cxt.bmg.add_query), size
+            list_from_parents(size, item_count, parents, cxt.bmg.add_query), size
         )
     if isinstance(node, bn.OperatorNode):
         return DevectorizedNode(
-            list_from_parents(item_count, parents, cxt.node_factories[type(node)]), size
+            list_from_parents(
+                size, item_count, parents, cxt.node_factories[type(node)]
+            ),
+            size,
         )
     if isinstance(node, bn.Observation):
         # TODO: What if the observation is of a different size than the
@@ -333,7 +421,10 @@ def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode
                     values.append(node.value[i][j])
         return DevectorizedNode(
             list_from_parents_with_index(
-                item_count, parents, lambda i, s: cxt.bmg.add_observation(*s, values[i])
+                size,
+                item_count,
+                parents,
+                lambda i, s: cxt.bmg.add_observation(*s, values[i]),
             ),
             size,
         )
