@@ -1,25 +1,27 @@
-import typing
 import math
+import typing
+from typing import Callable, List
+
 from torch import Size
-from typing import List, Callable
 
 # TODO: test me
 
 identity_fnc = lambda a: a
 
-def broadbast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Callable]:
+
+def broadcast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Callable]:
     if input_size == target_size:
         return identity_fnc
 
     # Make the input size length equal to target size by buffering with 1's
     input_project_size = []
-    if len(input_size) < len(target_size):
-        ones_to_add = len(target_size) - len(input_size)
-        for _ in range(0, ones_to_add):
-            input_project_size.append(1)
-        for dim in input_size:
-            input_project_size.append(dim)
+    ones_to_add = len(target_size) - len(input_size)
+    for _ in range(0, ones_to_add):
+        input_project_size.append(1)
+    for dim in input_size:
+        input_project_size.append(dim)
 
+    assert len(input_project_size) == len(target_size)
     # the input can be broadcast to the target if
     # input_dim[i] == target_dim[i] || input_dim[i] == 1 for all i
     for i in range(0, len(target_size)):
@@ -52,9 +54,14 @@ def broadbast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Cal
             j = j - 1
         return index_list
 
+    # product list should be [2, 1, 1]
     product_list = []
     current = 1
-    for d in target_size:
+    # the element at index j should be the size of the group at that dimension
+    # so if the input_project_size is [3,2,1], we want the array to be [2, 1, 1]
+    # for [1,1,3] we want [3, 3, 1]
+    for k in range(0, len(input_project_size)).__reversed__():
+        d = input_project_size[k]
         product_list.append(current)
         current = current * d
 
