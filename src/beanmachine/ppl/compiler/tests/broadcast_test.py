@@ -1,11 +1,7 @@
-import math
-import typing
 import unittest
-from typing import Callable, List
 
-import torch
 from beanmachine.ppl.compiler.broadcast import broadcast_fnc
-from torch import Size, tensor
+from torch import Size
 
 
 class BroadcastTest(unittest.TestCase):

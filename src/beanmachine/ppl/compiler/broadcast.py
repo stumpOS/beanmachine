@@ -4,8 +4,6 @@ from typing import Callable, List
 
 from torch import Size
 
-# TODO: test me
-
 identity_fnc = lambda a: a
 
 
@@ -22,6 +20,7 @@ def broadcast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Cal
         input_project_size.append(dim)
 
     assert len(input_project_size) == len(target_size)
+
     # the input can be broadcast to the target if
     # input_dim[i] == target_dim[i] || input_dim[i] == 1 for all i
     for i in range(0, len(target_size)):
@@ -57,9 +56,8 @@ def broadcast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Cal
     # product list should be [2, 1, 1]
     product_list = []
     current = 1
-    # the element at index j should be the size of the group at that dimension
-    # so if the input_project_size is [3,2,1], we want the array to be [2, 1, 1]
-    # for [1,1,3] we want [3, 3, 1]
+    # the element at index N-j should be the size of the group at dimension j
+    # for [1,1,3] we want [1,3,3]. For [3,2,1] we want [1,1,2]
     for k in range(0, len(input_project_size)).__reversed__():
         d = input_project_size[k]
         product_list.append(current)
