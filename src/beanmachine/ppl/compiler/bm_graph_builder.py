@@ -76,6 +76,7 @@ class BMGraphBuilder:
         self._node_counter = 0
         self._pd = None
         self.execution_context = execution_context
+        self.query_map = {}
 
     def _begin(self, s: str) -> None:
         pd = self._pd

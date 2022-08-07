@@ -7,6 +7,7 @@ import typing
 from typing import Callable, Dict, List, Type
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
+import beanmachine.ppl.compiler.broadcast
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.error_report import ErrorReport
 from beanmachine.ppl.compiler.fix_matrix_scale import matrix_scale_fixer
@@ -35,6 +36,7 @@ _consumes_tensor_types = [
     bn.IndexNode,
     bn.LogSumExpNode,
     bn.MatrixMultiplicationNode,
+    bn.MatrixScaleNode,
     bn.ToRealMatrixNode,
     bn.TransposeNode,
 ]
@@ -62,7 +64,6 @@ def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.ConstantTensorNode: bmg.add_constant_tensor,
         bn.UntypedConstantNode: bmg.add_constant,
     }
-
 
 def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     return {
@@ -142,15 +143,57 @@ _distribution_types = list(_distribution_factories(BMGraphBuilder()).keys())
 
 
 class BuilderContext:
-    def __init__(self, bmg_original: BMGraphBuilder):
+    def __init__(self, bmg_original: BMGraphBuilder, sizer: Sizer):
         self.original_context = bmg_original.execution_context
         self.bmg = BMGraphBuilder()
+        self.sizer = sizer
+        self.original_bmg = bmg_original
         self.dist_factories = _distribution_factories(self.bmg)
         self.node_factories = _node_factories(self.bmg)
         self.value_factories = _constant_factories(self.bmg)
         self.devectorized_nodes: Dict[bn.BMGNode, DevectorizedNode] = {}
         self.clones: Dict[bn.BMGNode, bn.BMGNode] = {}
 
+    def _is_matrix(self, node:bn.BMGNode) -> bool:
+        size = self.sizer[node]
+        l = len(size)
+        if l == 1:
+            return size[0] > 1
+        elif l == 2:
+            return True
+        else:
+            # either length is 0 or length is greater than 2 so it's a scalar or higher dimensional tensor
+            return False
+
+    def _scalar_and_tensor_parents(self, original_node:bn.BMGNode) -> typing.Optional[typing.Tuple[bn.BMGNode, bn.BMGNode]]:
+        if isinstance(original_node, bn.MultiplicationNode):
+            tensor_parent = None
+            scalar_parent = None
+            if len(original_node.inputs.inputs) > 2:
+                return None
+            for parent in original_node.inputs.inputs:
+                if self._is_matrix(parent) and tensor_parent == None:
+                    tensor_parent = parent
+                elif scalar_parent == None:
+                    scalar_parent = parent
+            if not scalar_parent == None and not tensor_parent == None:
+                return scalar_parent, tensor_parent
+            return None
+
+    # a node can be tensorized if all its parents satisfy the type requirements
+    def can_be_tensorized(self, original_node:bn.BMGNode) -> bool:
+        if isinstance(original_node, bn.MultiplicationNode):
+            return not self._scalar_and_tensor_parents(original_node) == None
+
+    def try_tensorize(self, original_node:bn.BMGNode) -> typing.Union[bool, bn.BMGNode]:
+        if isinstance(original_node, bn.MultiplicationNode):
+            parents = self._scalar_and_tensor_parents(original_node)
+            if not parents == None:
+                scalar_parent = parents[0]
+                tensor_parent = parents[1]
+                if self.clones.__contains__(scalar_parent) and self.clones.__contains__(tensor_parent):
+                    return self.bmg.add_matrix_scale(self.clones[scalar_parent], self.clones[tensor_parent])
+        return False
 
 def _is_fixable_size(s: Size) -> bool:
     dim = len(s)
@@ -161,10 +204,16 @@ def _is_fixable_size(s: Size) -> bool:
     return False
 
 
-def _needs_devectorize(node: bn.BMGNode, size: Size) -> bool:
-    return _is_fixable_size(size) and not _consumes_tensor_types.__contains__(
-        type(node)
-    )
+def _needs_devectorize(node: bn.BMGNode, size: Size, cxt:BuilderContext) -> bool:
+    is_eligible_for_devectorize = _is_fixable_size(size) and not _consumes_tensor_types.__contains__(type(node))
+    # if all downstream consumers either accept tensors or can be tensorized, then no need to devectorize
+    if is_eligible_for_devectorize:
+        for consumer in node.outputs.items:
+            if not _consumes_tensor_types.__contains__(consumer) and not cxt.can_be_tensorized(consumer):
+                return True
+        return False
+    else:
+        return is_eligible_for_devectorize
 
 
 def _node_to_index_list(
@@ -236,7 +285,7 @@ def list_from_parents_with_index(
     broadcast: Dict[DevectorizedNode, Callable] = {}
     for parent in parents:
         if isinstance(parent, DevectorizedNode):
-            broadbast_fnc_maybe = broadbast_fnc(parent.size, size)
+            broadbast_fnc_maybe = beanmachine.ppl.compiler.broadcast.broadcast_fnc(parent.size, size)
             if isinstance(broadbast_fnc_maybe, Callable):
                 broadcast[parent] = broadbast_fnc_maybe
             else:
@@ -282,6 +331,8 @@ def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext) -> bn.BMGNode:
         new_node = cxt.dist_factories[type(node)](*parents)
     elif isinstance(node, bn.Query):
         new_node = cxt.bmg.add_query(parents[0])
+        # todo: ask the previous version what the old one was first
+        cxt.bmg.query_map[node] = new_node
     elif isinstance(node, bn.TensorNode):
         new_node = cxt.bmg.add_tensor(size, *parents)
     elif isinstance(node, bn.Observation):
@@ -296,72 +347,6 @@ def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext) -> bn.BMGNode:
     for site in locations:
         cxt.bmg.execution_context.record_node_call(new_node, site)
     return new_node
-
-
-identity_fnc = lambda a: a
-
-
-def broadbast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Callable]:
-    if input_size == target_size:
-        return identity_fnc
-
-    # check if input can be broadcast to target and create input project size
-    input_project_size = []
-    if len(input_size) < len(target_size):
-        ones_to_add = len(target_size) - len(input_size)
-        for _ in range(0, ones_to_add):
-            input_project_size.append(1)
-        for dim in input_size:
-            input_project_size.append(dim)
-
-    for i in range(0, len(target_size)):
-        if input_project_size[i] != 1 and target_size[i] != input_project_size[i]:
-            return False
-
-    group_size = []
-    current = 1
-    L = len(target_size)
-    for k in range(0, L).__reversed__():
-        d = target_size[k]
-        group_size.append(current)
-        current = current * d
-
-    def target_index_to_composite(ti: int) -> List:
-        index_list = []
-        current_index = ti
-        j = len(target_size) - 1
-        for _ in target_size:
-            next_index = math.floor(current_index / group_size[j])
-            index_list.append(next_index)
-            current_index = current_index % group_size[j]
-            j = j - 1
-        return index_list
-
-    product_list = []
-    current = 1
-    for d in target_size:
-        product_list.append(current)
-        current = current * d
-    # given a composite index of target, compute a global index of input
-    def input_list_from_target_list(target_list: List[int]) -> int:
-        i = 0
-        j = len(product_list) - 1
-        index = 0
-        for inx in target_list:
-            if input_project_size[i] == 1:
-                i = i + 1
-                j = j - 1
-                continue
-            else:
-                next = inx * product_list[j]
-                index = index + next
-            j = j - 1
-            i = i + 1
-        return index
-
-    return lambda target_index: input_list_from_target_list(
-        target_index_to_composite(target_index)
-    )
 
 
 def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode:
@@ -434,16 +419,26 @@ def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode
 
 def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
     def vobs_fixer(bmg_old: BMGraphBuilder) -> GraphFixerResult:
-        # clone with splits
-        cxt = BuilderContext(bmg_old)
+        # clone with in place changes: (1) if a operator can be tensorized, tensorize it.
+        # (2) if an operator cannot be tensorized, devectorized its arguments
+        # otherwise, clone.
+        cxt = BuilderContext(bmg_old, sizer)
+        tensorized_nodes_cnt = 0
         for node in bmg_old.all_nodes():
             size: Size = sizer[node]
-            if _needs_devectorize(node, size):
+            if cxt.can_be_tensorized(node):
+                tensorized_nodes_cnt = tensorized_nodes_cnt + 1
+                node_maybe = cxt.try_tensorize(node)
+                if isinstance(node_maybe, bn.BMGNode):
+                    cxt.clones[node] = node_maybe
+                else:
+                    raise ValueError("expected a node but tensorize creation failed")
+            elif _needs_devectorize(node, size, cxt):
                 cxt.devectorized_nodes[node] = split(node, cxt, size)
             else:
                 cxt.clones[node] = _clone(node, size, cxt)
         split_nodes_cnt = len(cxt.devectorized_nodes)
-        if split_nodes_cnt > 0:
+        if split_nodes_cnt > 0 or tensorized_nodes_cnt > 0:
             return cxt.bmg, True, ErrorReport()
         else:
             return bmg_old, False, ErrorReport()
