@@ -231,7 +231,11 @@ class BMGInference:
         # TODO: this is not guaranteed to work
         rv_to_query_map = {}
         for rv, query in rt._rv_to_query.items():
-            rv_to_query_map[rv] = generated_graph.bmg.query_map[query]
+            if generated_graph.bmg.query_map.__contains__(query):
+                bmg_query = generated_graph.bmg.query_map[query]
+            else:
+                bmg_query = query
+            rv_to_query_map[rv] = bmg_query
 
         mcsamples = self._build_mcsamples(
             rv_to_query_map, samples, query_to_query_id, num_samples, num_chains

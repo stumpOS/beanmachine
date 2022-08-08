@@ -7,9 +7,13 @@ import typing
 from typing import Callable, Dict, List, Type
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
+import beanmachine.ppl.compiler.bmg_types
 import beanmachine.ppl.compiler.broadcast
+from beanmachine.ppl.compiler.bmg_types import BMGMatrixType, Untypable
+import beanmachine.ppl.compiler.execution_context
+import beanmachine.ppl.compiler.lattice_typer
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
-from beanmachine.ppl.compiler.error_report import ErrorReport
+from beanmachine.ppl.compiler.error_report import ErrorReport, UnsupportedNode, BadMatrixMultiplication
 from beanmachine.ppl.compiler.fix_matrix_scale import matrix_scale_fixer
 from beanmachine.ppl.compiler.fix_problem import (
     ancestors_first_graph_fixer,
@@ -39,6 +43,10 @@ _consumes_tensor_types = [
     bn.MatrixScaleNode,
     bn.ToRealMatrixNode,
     bn.TransposeNode,
+]
+
+_leaves = [
+    bn.Query
 ]
 
 _indexable_node_types = [
@@ -82,8 +90,12 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.Exp2Node: bmg.add_exp2,
         bn.ExpNode: bmg.add_exp,
         bn.ExpM1Node: bmg.add_expm1,
+        bn.GreaterThanNode: bmg.add_greater_than,
+        bn.GreaterThanEqualNode: bmg.add_greater_than_equal,
         bn.ItemNode: bmg.add_item,
         bn.IndexNode: bmg.add_index,
+        bn.LessThanNode: bmg.add_less_than,
+        bn.LessThanEqualNode: bmg.add_less_than_equal,
         bn.LogAddExpNode: bmg.add_logaddexp,
         bn.LogisticNode: bmg.add_logistic,
         bn.Log10Node: bmg.add_log10,
@@ -97,6 +109,7 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.MatrixMultiplicationNode: bmg.add_matrix_multiplication,
         bn.MultiplicationNode: bmg.add_multiplication,
         bn.NegateNode: bmg.add_negate,
+        bn.NotEqualNode: bmg.add_not_equal,
         bn.PhiNode: bmg.add_phi,
         bn.PowerNode: bmg.add_power,
         bn.SquareRootNode: bmg.add_squareroot,
@@ -205,11 +218,11 @@ def _is_fixable_size(s: Size) -> bool:
 
 
 def _needs_devectorize(node: bn.BMGNode, size: Size, cxt:BuilderContext) -> bool:
-    is_eligible_for_devectorize = _is_fixable_size(size) and not _consumes_tensor_types.__contains__(type(node))
+    is_eligible_for_devectorize = _is_fixable_size(size) and not _leaves.__contains__(type(node))
     # if all downstream consumers either accept tensors or can be tensorized, then no need to devectorize
     if is_eligible_for_devectorize:
         for consumer in node.outputs.items:
-            if not _consumes_tensor_types.__contains__(consumer) and not cxt.can_be_tensorized(consumer):
+            if not _consumes_tensor_types.__contains__(type(consumer)) and not cxt.can_be_tensorized(consumer):
                 return True
         return False
     else:
@@ -424,7 +437,36 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
         # otherwise, clone.
         cxt = BuilderContext(bmg_old, sizer)
         tensorized_nodes_cnt = 0
+        report = ErrorReport()
         for node in bmg_old.all_nodes():
+            # check nodes that may cause exceptions. TODO: extract this out
+            error = None
+            # enable registering size sensitive verification checks for certain nodes
+            # otherwise the sizer will be unable to determine a size which is necessary for
+            if isinstance(node, bn.MatrixMultiplicationNode):
+                lhs = node.inputs.inputs[0]
+                rhs = node.inputs.inputs[1]
+
+                lhs_size = sizer[node.inputs.inputs[0]]
+                rhs_size = sizer[node.inputs.inputs[1]]
+
+                if not (is_scalar(lhs_size) and is_scalar(rhs_size)):
+                    if not (len(lhs_size) == 2 and len(rhs_size) == 2) or lhs_size[1] != rhs_size[0]:
+                        typer = beanmachine.ppl.compiler.lattice_typer.LatticeTyper()
+                        # type and correct the types. We only care about dimensions so if the
+                        # typer cannot type it we just add dummy values for element types that
+                        # are undecipherable
+                        lt = typer[lhs]
+                        if not isinstance(lt, BMGMatrixType):
+                            lt = BMGMatrixType(Untypable, "", "", lhs_size[0], lhs_size[1])
+                        rt = typer[rhs]
+                        if not isinstance(rt, BMGMatrixType):
+                            rt = BMGMatrixType(Untypable, "", "", rhs_size[0], rhs_size[1])
+                        error = BadMatrixMultiplication(node, lt, rt, cxt.original_context.node_locations(node))
+            if not error == None:
+                report.add_error(error)
+                return bmg_old, False, report
+
             size: Size = sizer[node]
             if cxt.can_be_tensorized(node):
                 tensorized_nodes_cnt = tensorized_nodes_cnt + 1
@@ -439,9 +481,9 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
                 cxt.clones[node] = _clone(node, size, cxt)
         split_nodes_cnt = len(cxt.devectorized_nodes)
         if split_nodes_cnt > 0 or tensorized_nodes_cnt > 0:
-            return cxt.bmg, True, ErrorReport()
+            return cxt.bmg, True, report
         else:
-            return bmg_old, False, ErrorReport()
+            return bmg_old, False, report
 
     return vobs_fixer
 
