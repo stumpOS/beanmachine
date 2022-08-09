@@ -97,6 +97,7 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.ExpM1Node: bmg.add_expm1,
         bn.GreaterThanNode: bmg.add_greater_than,
         bn.GreaterThanEqualNode: bmg.add_greater_than_equal,
+        bn.IfThenElseNode: bmg.add_if_then_else,
         bn.ItemNode: bmg.add_item,
         bn.IndexNode: bmg.add_index,
         bn.LessThanNode: bmg.add_less_than,
@@ -229,9 +230,14 @@ def _needs_devectorize(node: bn.BMGNode, size: Size, cxt:BuilderContext) -> bool
     is_eligible_for_devectorize = _is_fixable_size(size) and not _leaves.__contains__(type(node))
     if is_eligible_for_devectorize:
         # I think sample and observations can be devectorized, but they do not have to be
-        if isinstance(node, bn.SampleNode) or isinstance(node, bn.Observation):
+        if isinstance(node, bn.SampleNode):
             if cxt.devectorized_nodes.__contains__(node.inputs.inputs[0]):
                 return True
+        if isinstance(node, bn.Observation):
+            if cxt.devectorized_nodes.__contains__(node.inputs.inputs[0]):
+                return True
+            else:
+                return False
 
         # since the children of distribution nodes are devectorized depending on the parent,
         # do not check downstream nodes
@@ -243,7 +249,8 @@ def _needs_devectorize(node: bn.BMGNode, size: Size, cxt:BuilderContext) -> bool
         for consumer in node.outputs.items:
             if not _consumes_tensor_types.__contains__(type(consumer)) and not cxt.can_be_tensorized(consumer):
                 return True
-        return False
+        # if it reaches this point, it does not need to be vectorized because of downstream needs
+        return not _consumes_tensor_types.__contains__(type(node))
     else:
         return is_eligible_for_devectorize
 
@@ -466,7 +473,7 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
                 lhs_size = sizer[node.inputs.inputs[0]]
                 rhs_size = sizer[node.inputs.inputs[1]]
 
-                if not (is_scalar(lhs_size) and is_scalar(rhs_size)):
+                if not (is_scalar(lhs_size) or is_scalar(rhs_size)):
                     if not (len(lhs_size) == 2 and len(rhs_size) == 2) or lhs_size[1] != rhs_size[0]:
                         typer = beanmachine.ppl.compiler.lattice_typer.LatticeTyper()
                         # type and correct the types. We only care about dimensions so if the

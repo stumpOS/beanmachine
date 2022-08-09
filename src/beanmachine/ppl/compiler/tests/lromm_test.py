@@ -148,9 +148,9 @@ digraph "graph" {
   N64[label=ToProb];
   N65[label=Bernoulli];
   N66[label=Sample];
-  N67[label=3];
-  N68[label=ToMatrix];
-  N69[label="Observation tensor([1., 1., 1.])"];
+  N67[label="Observation True"];
+  N68[label="Observation True"];
+  N69[label="Observation True"];
   N70[label=Query];
   N71[label=Query];
   N72[label=Query];
@@ -208,9 +208,8 @@ digraph "graph" {
   N31 -> N32;
   N32 -> N33;
   N33 -> N34;
-  N34 -> N68;
+  N34 -> N67;
   N35 -> N36;
-  N35 -> N68;
   N36 -> N37;
   N37 -> N38;
   N37 -> N43;
@@ -245,9 +244,7 @@ digraph "graph" {
   N63 -> N64;
   N64 -> N65;
   N65 -> N66;
-  N66 -> N68;
-  N67 -> N68;
-  N68 -> N69;
+  N66 -> N69;
 }
-        """
+"""
         self.assertEqual(observed.strip(), expected.strip())
