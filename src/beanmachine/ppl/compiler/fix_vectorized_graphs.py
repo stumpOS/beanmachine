@@ -37,6 +37,7 @@ _consumes_tensor_types = [
     bn.CategoricalNode,
     bn.CholeskyNode,
     bn.ColumnIndexNode,
+    bn.ConstantPositiveRealMatrixNode,
     bn.DirichletNode,
     bn.IndexNode,
     bn.LogSumExpNode,
@@ -59,13 +60,14 @@ class ElementType(Enum):
 
 _unary_matrix_ops = [
     bn.TransposeNode,
-    bn.IndexNode,
     bn.CholeskyNode
 ]
 
 def requires_element_type_at(node: bn.BMGNode, index: int) -> ElementType:
     if isinstance(node, bn.MatrixMultiplicationNode):
         assert index == 0 or index == 1
+        return ElementType.TENSOR
+    if isinstance(node, bn.IndexNode):
         return ElementType.TENSOR
     if _unary_matrix_ops.__contains__(type(node)):
         assert index == 0
@@ -426,29 +428,33 @@ def list_from_parents_with_index(
 
 def _clone_parents(node: bn.BMGNode, cxt: BuilderContext) -> List[typing.Union[bn.BMGNode, DevectorizedNode]]:
     parents = []
+
+    def take_clone(p:bn.BMGNode):
+        if cxt.clones.__contains__(p):
+            parent = cxt.clones[p]
+            parents.append(parent)
+        else:
+            raise ValueError("encountered a value not in the clone context")
+
     j = 0
     for p in node.inputs.inputs:
         element_type_must_be_tensor = requires_element_type_at(node, j) == ElementType.TENSOR
 
         if element_type_must_be_tensor:
-            if cxt.clones.__contains__(p):
-                parent = cxt.clones[p]
-                parents.append(parent)
-            else:
-                raise ValueError("encountered a value not in the clone context")
+            take_clone(p)
         else:
             parent_was_tensor = not is_scalar(cxt.sizer[p])
             if parent_was_tensor:
                 if cxt.devectorized_nodes.__contains__(p):
                     parents.append(cxt.devectorized_nodes[p])
                 else:
-                    raise ValueError("expected a parent to be devectorized")
+                    parent_may_be_tensor = _consumes_tensor_types.__contains__(type(node))
+                    if parent_may_be_tensor:
+                        take_clone(p)
+                    else:
+                        raise ValueError("expected a parent to be devectorized")
             else:
-                if cxt.clones.__contains__(p):
-                    parent = cxt.clones[p]
-                    parents.append(parent)
-                else:
-                    raise ValueError("encountered a value not in the clone context")
+                take_clone(p)
         j = j + 1
 
     return parents
