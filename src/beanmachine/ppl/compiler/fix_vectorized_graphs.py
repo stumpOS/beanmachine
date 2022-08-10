@@ -38,6 +38,7 @@ _consumes_tensor_types = [
     bn.CholeskyNode,
     bn.ColumnIndexNode,
     bn.ConstantPositiveRealMatrixNode,
+    bn.ConstantTensorNode,
     bn.DirichletNode,
     bn.IndexNode,
     bn.LogSumExpNode,
@@ -147,8 +148,12 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.GreaterThanNode: bmg.add_greater_than,
         bn.GreaterThanEqualNode: bmg.add_greater_than_equal,
         bn.IfThenElseNode: bmg.add_if_then_else,
+        bn.IsNode: bmg.add_is,
+        bn.IsNotNode: bmg.add_is_not,
         bn.ItemNode: bmg.add_item,
         bn.IndexNode: bmg.add_index,
+        bn.InNode: bmg.add_in,
+        bn.InvertNode: bmg.add_invert,
         bn.LessThanNode: bmg.add_less_than,
         bn.LessThanEqualNode: bmg.add_less_than_equal,
         bn.LogAddExpNode: bmg.add_logaddexp,
@@ -161,13 +166,18 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.LogProbNode: bmg.add_log_prob,
         bn.LogNode: bmg.add_log,
         bn.LogSumExpTorchNode: bmg.add_logsumexp_torch,
+        bn.LShiftNode: bmg.add_lshift,
         bn.MatrixMultiplicationNode: bmg.add_matrix_multiplication,
         bn.MatrixScaleNode: bmg.add_matrix_scale,
+        bn.ModNode: bmg.add_mod,
         bn.MultiplicationNode: bmg.add_multiplication,
         bn.NegateNode: bmg.add_negate,
         bn.NotEqualNode: bmg.add_not_equal,
+        bn.NotNode: bmg.add_not,
+        bn.NotInNode: bmg.add_not_in,
         bn.PhiNode: bmg.add_phi,
         bn.PowerNode: bmg.add_power,
+        bn.RShiftNode: bmg.add_rshift,
         bn.SquareRootNode: bmg.add_squareroot,
         bn.SwitchNode: bmg.add_switch,
         bn.SumNode: bmg.add_sum,
@@ -276,21 +286,11 @@ def _is_fixable_size(s: Size) -> bool:
         return s[0] > 1 or s[1] > 1
     return False
 
-# a node needs to be devectorized under one of the following conditions:
-# (1) if it MAY be devectorized AND there is a child that does NOT consume tensors.
-#     If the target MAY NOT be devectorized and the downstream operator does NOT consume tensors, we should error out.
-#     Although we could potentially resolve this by devectorizing above one level, we want to avoid full graph analysis for
-#     for each node at this time. I think it makes more sense to focus efforts on creating tensorized versions of all ops.
-# (2) if it MUST be devectorized (i.e. if it is an operator that does not have a tensor impl)
-# (3) if it MAY be devectorized AND the parents were devectorized
-# (This case is arguable so I only enforce this for Sample and Observation so that the test expectations remain unchanged)
+
 class DevectorizeTransformation(Enum):
     YES = 1
     YES_WITH_MERGE = 2
     NO = 3
-
-
-
 
 def _needs_devectorize(node: bn.BMGNode, size: Size, cxt:BuilderContext) -> DevectorizeTransformation:
     is_eligible_for_devectorize = _is_fixable_size(size) and not _leaves.__contains__(type(node))
