@@ -42,6 +42,7 @@ _consumes_tensor_types = [
     bn.IndexNode,
     bn.LogSumExpNode,
     bn.LogSumExpVectorNode,
+    bn.LogSumExpTorchNode,
     bn.MatrixMultiplicationNode,
     bn.MatrixScaleNode,
     bn.Observation, # unsure, can observations consume tensor types? See Dirichlet and Category tests
@@ -496,8 +497,15 @@ def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext, parent_cloner:Call
         new_node = cxt.dist_factories[type(node)](*parents)
     elif isinstance(node, bn.Query):
         new_node = cxt.bmg.add_query(parents[0])
-        # todo: ask the previous version what the old one was first
-        cxt.bmg.query_map[node] = new_node
+
+        # todo: HACK refactor
+        key = node
+        for k, v in cxt.original_bmg.query_map.items():
+            if v == node:
+                key = k
+                break
+
+        cxt.bmg.query_map[key] = new_node
     elif isinstance(node, bn.TensorNode):
         new_node = cxt.bmg.add_tensor(size, *parents)
     elif isinstance(node, bn.Observation):
