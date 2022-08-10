@@ -224,103 +224,6 @@ digraph "graph" {
 """
         self.assertEqual(expected.strip(), observed.strip())
 
-    def test_broadcast(self) -> None:
-        # mu is size 1 x 3
-        @bm.random_variable
-        def mu():
-            return Bernoulli(tensor([0.6, 0.3, 0.1]))
-
-        # sigma is size 2 x 3
-        @bm.random_variable
-        def sigma():
-            return StudentT(
-                tensor([[2.0, 3.0, 4.0], [5.0, 8.0, 9.0]]),
-                tensor([[0.2, 0.3, 0.4], [0.5, 0.8, 0.9]]),
-                tensor([[0.2, 0.3, 0.4], [0.5, 0.8, 0.9]]),
-            )
-
-        # what size is bar?
-        @bm.random_variable
-        def bar():
-            return Normal(mu(), sigma())
-
-        observations = {bar(): tensor([[0.92, 0.83, 0.84], [0.75, 0.68, 0.99]])}
-        queries = [bar()]
-        observed = BMGInference().to_dot(queries, observations)
-        self.assertTrue(observed != "")
-
-    def test_fix_vectorized_models_1v2(self) -> None:
-        self.maxDiff = None
-        observations = {flip_beta(): tensor([0.0, 1.0])}
-        queries = [flip_beta()]
-
-        observed = BMGInference().to_dot(queries, observations, after_transform=False)
-
-        # The model before the rewrite:
-
-        expected = """
-digraph "graph" {
-  N0[label=2.0];
-  N1[label=Beta];
-  N2[label=Sample];
-  N3[label=Sample];
-  N4[label=Tensor];
-  N5[label=Bernoulli];
-  N6[label=Sample];
-  N7[label="Observation tensor([0., 1.])"];
-  N8[label=Query];
-  N0 -> N1;
-  N0 -> N1;
-  N1 -> N2;
-  N1 -> N3;
-  N2 -> N4;
-  N3 -> N4;
-  N4 -> N5;
-  N5 -> N6;
-  N6 -> N7;
-  N6 -> N8;
-}
-"""
-        self.assertEqual(expected.strip(), observed.strip())
-
-        # After:
-
-        observed = BMGInference().to_dot(queries, observations, after_transform=True)
-        expected = """
-digraph "graph" {
-  N00[label=2.0];
-  N01[label=Beta];
-  N02[label=Sample];
-  N03[label=Sample];
-  N04[label=Bernoulli];
-  N05[label=Sample];
-  N06[label=Bernoulli];
-  N07[label=Sample];
-  N08[label="Observation False"];
-  N09[label="Observation True"];
-  N10[label=2];
-  N11[label=1];
-  N12[label=ToMatrix];
-  N13[label=Query];
-  N00 -> N01;
-  N00 -> N01;
-  N01 -> N02;
-  N01 -> N03;
-  N02 -> N04;
-  N03 -> N06;
-  N04 -> N05;
-  N05 -> N08;
-  N05 -> N12;
-  N06 -> N07;
-  N07 -> N09;
-  N07 -> N12;
-  N10 -> N12;
-  N11 -> N12;
-  N12 -> N13;
-}
-"""
-        self.assertEqual(expected.strip(), observed.strip())
-
     def test_fix_vectorized_models_2(self) -> None:
         self.maxDiff = None
         observations = {flip_const_4(): tensor([0.0, 1.0, 0.0, 1.0])}
@@ -354,44 +257,44 @@ digraph "graph" {
         observed = BMGInference().to_dot(queries, observations, after_transform=True)
         expected = """
 digraph "graph" {
-  N00[label=4];
-  N01[label=1];
-  N02[label=0.25];
-  N03[label=Bernoulli];
-  N04[label=Sample];
-  N05[label=0.75];
-  N06[label=Bernoulli];
-  N07[label=Sample];
-  N08[label=0.5];
+  N00[label=0.25];
+  N01[label=Bernoulli];
+  N02[label=Sample];
+  N03[label=0.75];
+  N04[label=Bernoulli];
+  N05[label=Sample];
+  N06[label=0.5];
+  N07[label=Bernoulli];
+  N08[label=Sample];
   N09[label=Bernoulli];
   N10[label=Sample];
-  N11[label=Bernoulli];
-  N12[label=Sample];
-  N13[label=ToMatrix];
-  N14[label=Query];
-  N15[label="Observation False"];
-  N16[label="Observation True"];
-  N17[label="Observation False"];
-  N18[label="Observation True"];
-  N00 -> N13;
-  N01 -> N13;
-  N02 -> N03;
+  N11[label="Observation False"];
+  N12[label="Observation True"];
+  N13[label="Observation False"];
+  N14[label="Observation True"];
+  N15[label=4];
+  N16[label=1];
+  N17[label=ToMatrix];
+  N18[label=Query];
+  N00 -> N01;
+  N01 -> N02;
+  N02 -> N11;
+  N02 -> N17;
   N03 -> N04;
-  N04 -> N13;
-  N04 -> N15;
-  N05 -> N06;
+  N04 -> N05;
+  N05 -> N12;
+  N05 -> N17;
   N06 -> N07;
-  N07 -> N13;
-  N07 -> N16;
-  N08 -> N09;
-  N08 -> N11;
+  N06 -> N09;
+  N07 -> N08;
+  N08 -> N13;
+  N08 -> N17;
   N09 -> N10;
-  N10 -> N13;
+  N10 -> N14;
   N10 -> N17;
-  N11 -> N12;
-  N12 -> N13;
-  N12 -> N18;
-  N13 -> N14;
+  N15 -> N17;
+  N16 -> N17;
+  N17 -> N18;
 }
 """
         self.assertEqual(expected.strip(), observed.strip())
@@ -425,61 +328,61 @@ digraph "graph" {
         observed = BMGInference().to_dot(queries, observations, after_transform=True)
         expected = """
 digraph "graph" {
-  N00[label=3];
-  N01[label=2];
-  N02[label=0.25];
-  N03[label=Bernoulli];
-  N04[label=Sample];
-  N05[label=0.75];
-  N06[label=Bernoulli];
-  N07[label=Sample];
-  N08[label=0.5];
-  N09[label=Bernoulli];
-  N10[label=Sample];
-  N11[label=0.125];
-  N12[label=Bernoulli];
-  N13[label=Sample];
-  N14[label=0.875];
-  N15[label=Bernoulli];
-  N16[label=Sample];
-  N17[label=0.625];
-  N18[label=Bernoulli];
-  N19[label=Sample];
-  N20[label=ToMatrix];
-  N21[label=Query];
-  N22[label="Observation False"];
-  N23[label="Observation False"];
-  N24[label="Observation False"];
-  N25[label="Observation True"];
-  N26[label="Observation True"];
-  N27[label="Observation True"];
-  N00 -> N20;
-  N01 -> N20;
-  N02 -> N03;
+  N00[label=0.25];
+  N01[label=Bernoulli];
+  N02[label=Sample];
+  N03[label=0.75];
+  N04[label=Bernoulli];
+  N05[label=Sample];
+  N06[label=0.5];
+  N07[label=Bernoulli];
+  N08[label=Sample];
+  N09[label=0.125];
+  N10[label=Bernoulli];
+  N11[label=Sample];
+  N12[label=0.875];
+  N13[label=Bernoulli];
+  N14[label=Sample];
+  N15[label=0.625];
+  N16[label=Bernoulli];
+  N17[label=Sample];
+  N18[label="Observation False"];
+  N19[label="Observation False"];
+  N20[label="Observation False"];
+  N21[label="Observation True"];
+  N22[label="Observation True"];
+  N23[label="Observation True"];
+  N24[label=3];
+  N25[label=2];
+  N26[label=ToMatrix];
+  N27[label=Query];
+  N00 -> N01;
+  N01 -> N02;
+  N02 -> N18;
+  N02 -> N26;
   N03 -> N04;
-  N04 -> N20;
-  N04 -> N22;
-  N05 -> N06;
+  N04 -> N05;
+  N05 -> N19;
+  N05 -> N26;
   N06 -> N07;
-  N07 -> N20;
-  N07 -> N23;
-  N08 -> N09;
+  N07 -> N08;
+  N08 -> N20;
+  N08 -> N26;
   N09 -> N10;
-  N10 -> N20;
-  N10 -> N24;
-  N11 -> N12;
+  N10 -> N11;
+  N11 -> N21;
+  N11 -> N26;
   N12 -> N13;
-  N13 -> N20;
-  N13 -> N25;
-  N14 -> N15;
+  N13 -> N14;
+  N14 -> N22;
+  N14 -> N26;
   N15 -> N16;
-  N16 -> N20;
-  N16 -> N26;
-  N17 -> N18;
-  N18 -> N19;
-  N19 -> N20;
-  N19 -> N27;
-  N20 -> N21;
+  N16 -> N17;
+  N17 -> N23;
+  N17 -> N26;
+  N24 -> N26;
+  N25 -> N26;
+  N26 -> N27;
 }
     """
         self.assertEqual(expected.strip(), observed.strip())
@@ -530,29 +433,29 @@ digraph "graph" {
   N01[label=Beta];
   N02[label=Sample];
   N03[label=Sample];
-  N04[label=2];
-  N05[label=1];
-  N06[label=ToReal];
-  N07[label="Bernoulli(logits)"];
-  N08[label=Sample];
-  N09[label=ToReal];
-  N10[label="Bernoulli(logits)"];
-  N11[label=Sample];
+  N04[label=ToReal];
+  N05[label="Bernoulli(logits)"];
+  N06[label=Sample];
+  N07[label=ToReal];
+  N08[label="Bernoulli(logits)"];
+  N09[label=Sample];
+  N10[label=2];
+  N11[label=1];
   N12[label=ToMatrix];
   N13[label=Query];
   N00 -> N01;
   N00 -> N01;
   N01 -> N02;
   N01 -> N03;
-  N02 -> N06;
-  N03 -> N09;
-  N04 -> N12;
-  N05 -> N12;
-  N06 -> N07;
+  N02 -> N04;
+  N03 -> N07;
+  N04 -> N05;
+  N05 -> N06;
+  N06 -> N12;
   N07 -> N08;
-  N08 -> N12;
-  N09 -> N10;
-  N10 -> N11;
+  N08 -> N09;
+  N09 -> N12;
+  N10 -> N12;
   N11 -> N12;
   N12 -> N13;
 }
@@ -1079,33 +982,33 @@ digraph "graph" {
         observed = BMGInference().to_dot(queries, observations, after_transform=True)
         expected = """
 digraph "graph" {
-  N00[label=2];
-  N01[label=1];
-  N02[label=2.0];
-  N03[label=3.0];
-  N04[label=Beta];
-  N05[label=Sample];
-  N06[label=complement];
-  N07[label=Log];
-  N08[label=4.0];
-  N09[label=Beta];
-  N10[label=Sample];
+  N00[label=2.0];
+  N01[label=3.0];
+  N02[label=Beta];
+  N03[label=Sample];
+  N04[label=4.0];
+  N05[label=Beta];
+  N06[label=Sample];
+  N07[label=2];
+  N08[label=1];
+  N09[label=complement];
+  N10[label=Log];
   N11[label=complement];
   N12[label=Log];
   N13[label=ToMatrix];
   N14[label=Query];
-  N00 -> N13;
-  N01 -> N13;
-  N02 -> N04;
-  N02 -> N09;
-  N03 -> N04;
+  N00 -> N02;
+  N00 -> N05;
+  N01 -> N02;
+  N02 -> N03;
+  N03 -> N09;
   N04 -> N05;
   N05 -> N06;
-  N06 -> N07;
+  N06 -> N11;
   N07 -> N13;
-  N08 -> N09;
+  N08 -> N13;
   N09 -> N10;
-  N10 -> N11;
+  N10 -> N13;
   N11 -> N12;
   N12 -> N13;
   N13 -> N14;
@@ -1120,21 +1023,21 @@ digraph "graph" {
         observed = BMGInference().to_dot(queries, observations)
         expected = """
 digraph "graph" {
-  N00[label=5.0];
-  N01[label=1.0];
-  N02[label=3.0];
-  N03[label=Beta];
-  N04[label=Sample];
-  N05[label=complement];
-  N06[label=Log];
-  N07[label="-"];
-  N08[label="*"];
-  N09[label="-"];
-  N10[label=6.0];
-  N11[label=2.0];
-  N12[label=4.0];
-  N13[label=Beta];
-  N14[label=Sample];
+  N00[label=1.0];
+  N01[label=3.0];
+  N02[label=Beta];
+  N03[label=Sample];
+  N04[label=2.0];
+  N05[label=4.0];
+  N06[label=Beta];
+  N07[label=Sample];
+  N08[label=5.0];
+  N09[label=complement];
+  N10[label=Log];
+  N11[label="-"];
+  N12[label="*"];
+  N13[label="-"];
+  N14[label=6.0];
   N15[label=complement];
   N16[label=Log];
   N17[label="-"];
@@ -1142,21 +1045,21 @@ digraph "graph" {
   N19[label="-"];
   N20[label="+"];
   N21[label=Query];
-  N00 -> N08;
-  N01 -> N03;
+  N00 -> N02;
+  N01 -> N02;
   N02 -> N03;
-  N03 -> N04;
-  N04 -> N05;
+  N03 -> N09;
+  N04 -> N06;
   N05 -> N06;
   N06 -> N07;
-  N07 -> N08;
-  N08 -> N09;
-  N09 -> N20;
-  N10 -> N18;
-  N11 -> N13;
+  N07 -> N15;
+  N08 -> N12;
+  N09 -> N10;
+  N10 -> N11;
+  N11 -> N12;
   N12 -> N13;
-  N13 -> N14;
-  N14 -> N15;
+  N13 -> N20;
+  N14 -> N18;
   N15 -> N16;
   N16 -> N17;
   N17 -> N18;
