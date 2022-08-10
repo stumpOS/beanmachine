@@ -27,7 +27,7 @@ from beanmachine.ppl.compiler.fix_problem import (
     NodeFixerResult,
     sequential_graph_fixer,
 )
-from beanmachine.ppl.compiler.sizer import is_scalar, Sizer
+from beanmachine.ppl.compiler.sizer import is_scalar, Sizer, Unsized
 
 # TODO Move this to a utils module
 from beanmachine.ppl.compiler.support import _prod
@@ -41,6 +41,7 @@ _consumes_tensor_types = [
     bn.DirichletNode,
     bn.IndexNode,
     bn.LogSumExpNode,
+    bn.LogSumExpVectorNode,
     bn.MatrixMultiplicationNode,
     bn.MatrixScaleNode,
     bn.Observation, # unsure, can observations consume tensor types? See Dirichlet and Category tests
@@ -59,7 +60,10 @@ class ElementType(Enum):
     ANY = 3
 
 _unary_matrix_ops = [
+    bn.LogSumExpVectorNode,
     bn.TransposeNode,
+    bn.ToPositiveRealMatrixNode,
+    bn.ToRealMatrixNode,
     bn.CholeskyNode
 ]
 
@@ -138,6 +142,7 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.Exp2Node: bmg.add_exp2,
         bn.ExpNode: bmg.add_exp,
         bn.ExpM1Node: bmg.add_expm1,
+        bn.ExpProductFactorNode: bmg.add_exp_product,
         bn.GreaterThanNode: bmg.add_greater_than,
         bn.GreaterThanEqualNode: bmg.add_greater_than_equal,
         bn.IfThenElseNode: bmg.add_if_then_else,
@@ -443,7 +448,11 @@ def _clone_parents(node: bn.BMGNode, cxt: BuilderContext) -> List[typing.Union[b
         if element_type_must_be_tensor:
             take_clone(p)
         else:
-            parent_was_tensor = not is_scalar(cxt.sizer[p])
+            sz = cxt.sizer[p]
+            if sz == Unsized:
+                parent_was_tensor = False
+            else:
+                parent_was_tensor = not is_scalar(sz)
             if parent_was_tensor:
                 if cxt.devectorized_nodes.__contains__(p):
                     parents.append(cxt.devectorized_nodes[p])
