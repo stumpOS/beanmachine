@@ -174,6 +174,10 @@ class UnsupportedNodeFixer:
         # * If we have an index into a multi-column matrix, replace it with
         #   a column index
         left = node.left
+        if isinstance(left, bn.ConstantTensorNode):
+            if len(left.value.shape) == 1:
+                return self._replace_index_one_column(node)
+
         node_type = self._typer[left]
         if not isinstance(node_type, bt.BMGMatrixType):
             return None

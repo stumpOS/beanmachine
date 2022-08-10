@@ -10,7 +10,7 @@ from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.gen_bmg_cpp import to_bmg_cpp
 from beanmachine.ppl.compiler.gen_bmg_graph import to_bmg_graph
 from beanmachine.ppl.compiler.gen_bmg_python import to_bmg_python
-from beanmachine.ppl.compiler.gen_dot import to_dot
+from beanmachine.ppl.compiler.gen_dot import to_dot, to_dot_get_graph
 from beanmachine.ppl.compiler.runtime import BMGRuntime
 from torch import tensor
 from torch.distributions import Normal
@@ -49,7 +49,7 @@ class ToMatrixTest(unittest.TestCase):
     def test_to_matrix_1by2(self) -> None:
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([f1by2()], {})
-        observed = to_dot(
+        bmg, observed = to_dot_get_graph(
             bmg,
             node_types=True,
             edge_requirements=True,
@@ -161,7 +161,7 @@ digraph "graph" {
     def test_to_matrix_2by1(self) -> None:
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([f2by1()], {})
-        observed = to_dot(
+        bmg, observed = to_dot_get_graph(
             bmg,
             node_types=True,
             edge_requirements=True,
@@ -328,27 +328,27 @@ digraph "graph" {
         # real matrix, and inserts a ToRealMatrix node on that edge.
 
         self.maxDiff = None
-        bmg = BMGraphBuilder()
-        zero = bmg.add_constant(0)
-        one = bmg.add_constant(1)
-        two = bmg.add_natural(2)
-        three = bmg.add_constant(3)
-        beta = bmg.add_beta(three, three)
-        b0 = bmg.add_sample(beta)
-        b1 = bmg.add_sample(beta)
-        b2 = bmg.add_sample(beta)
-        b3 = bmg.add_sample(beta)
-        pm = bmg.add_to_matrix(two, two, b0, b1, b2, b3)
-        c0 = bmg.add_column_index(pm, zero)
-        c1 = bmg.add_column_index(pm, one)
-        tpr = bmg.add_to_positive_real_matrix(c1)
-        lse0 = bmg.add_logsumexp_vector(c0)
-        lse1 = bmg.add_logsumexp_vector(tpr)
-        bmg.add_query(lse0)
-        bmg.add_query(lse1)
+        bmg_raw = BMGraphBuilder()
+        zero = bmg_raw.add_constant(0)
+        one = bmg_raw.add_constant(1)
+        two = bmg_raw.add_natural(2)
+        three = bmg_raw.add_constant(3)
+        beta = bmg_raw.add_beta(three, three)
+        b0 = bmg_raw.add_sample(beta)
+        b1 = bmg_raw.add_sample(beta)
+        b2 = bmg_raw.add_sample(beta)
+        b3 = bmg_raw.add_sample(beta)
+        pm = bmg_raw.add_to_matrix(two, two, b0, b1, b2, b3)
+        c0 = bmg_raw.add_column_index(pm, zero)
+        c1 = bmg_raw.add_column_index(pm, one)
+        tpr = bmg_raw.add_to_positive_real_matrix(c1)
+        lse0 = bmg_raw.add_logsumexp_vector(c0)
+        lse1 = bmg_raw.add_logsumexp_vector(tpr)
+        bmg_raw.add_query(lse0)
+        bmg_raw.add_query(lse1)
 
-        observed = to_dot(
-            bmg,
+        bmg, observed = to_dot_get_graph(
+            bmg_raw,
             node_types=True,
             edge_requirements=True,
             after_transform=True,

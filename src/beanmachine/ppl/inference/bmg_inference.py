@@ -46,6 +46,7 @@ class BMGInference:
     is currently limited.
     """
 
+    _devectorize: bool = True
     _fix_observe_true: bool = False
     _pd: Optional[prof.ProfilerData] = None
 
@@ -73,6 +74,7 @@ class BMGInference:
         bmg = rt.accumulate_graph(queries, observations)
         # TODO: Figure out a better way to pass this flag around
         bmg._fix_observe_true = self._fix_observe_true
+        bmg._devectorize = self._devectorize
         return rt
 
     def _transpose_samples(self, raw):
@@ -181,12 +183,15 @@ class BMGInference:
         if produce_report:
             self._pd = prof.ProfilerData()
 
+        # create runtime (this includes a map from queries to query nodes)
         rt = self._accumulate_graph(queries, observations)
         bmg = rt._bmg
         report = pr.PerformanceReport()
 
         self._begin(prof.infer)
 
+        # optimize graph. This results in a NEW graph getting created, which warrants the
+        # runtime out of date
         generated_graph = to_bmg_graph(bmg, skip_optimizations)
         g = generated_graph.graph
         query_to_query_id = generated_graph.query_to_query_id
@@ -223,8 +228,17 @@ class BMGInference:
             samples = [self._transpose_samples(r) for r in raw]
 
         # TODO: Make _rv_to_query public. Add it to BMGraphBuilder?
+        # TODO: this is not guaranteed to work
+        rv_to_query_map = {}
+        for rv, query in rt._rv_to_query.items():
+            if generated_graph.bmg.query_map.__contains__(query):
+                bmg_query = generated_graph.bmg.query_map[query]
+            else:
+                bmg_query = query
+            rv_to_query_map[rv] = bmg_query
+
         mcsamples = self._build_mcsamples(
-            rt._rv_to_query, samples, query_to_query_id, num_samples, num_chains
+            rv_to_query_map, samples, query_to_query_id, num_samples, num_chains
         )
 
         self._finish(prof.infer)
