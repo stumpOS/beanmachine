@@ -79,6 +79,7 @@ Function Unit is not supported by Bean Machine Graph.
         queries = [beta_0(), beta_1(), sigma_out(), theta()]
         observations = {d(): ones(len(_y_obs))}
         observed = BMGInference().to_dot(queries, observations)
+        # TODO: are ToMatrix and ToRealMatrix needed?
         expected = """
 digraph "graph" {
   N00[label=2.0];
@@ -247,4 +248,4 @@ digraph "graph" {
   N66 -> N69;
 }
 """
-        self.assertEqual(observed.strip(), expected.strip())
+        self.assertEqual(expected.strip(), observed.strip())

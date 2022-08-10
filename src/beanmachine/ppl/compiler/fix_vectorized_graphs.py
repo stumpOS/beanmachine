@@ -5,6 +5,7 @@
 import math
 import typing
 from typing import Callable, Dict, List, Type
+from enum import Enum
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
 import beanmachine.ppl.compiler.bmg_types
@@ -44,10 +45,40 @@ _consumes_tensor_types = [
     bn.Observation, # unsure, can observations consume tensor types? See Dirichlet and Category tests
     bn.Query,
     bn.SampleNode, # unsure, can samples consume tensor types? See Dirichlet and Category tests
-    bn.SumNode,
+    bn.SumNode, # I think this sum only accepts scalars since it was added in May and tensor summation was only recently added to BMG
     bn.ToRealMatrixNode,
     bn.TransposeNode,
+    bn.UntypedConstantNode
 ]
+
+
+class ElementType(Enum):
+    TENSOR = 1
+    SCALAR = 2
+    ANY = 3
+
+_unary_matrix_ops = [
+    bn.TransposeNode,
+    bn.IndexNode,
+    bn.CholeskyNode
+]
+
+def requires_element_type_at(node: bn.BMGNode, index: int) -> ElementType:
+    if isinstance(node, bn.MatrixMultiplicationNode):
+        assert index == 0 or index == 1
+        return ElementType.TENSOR
+    if _unary_matrix_ops.__contains__(type(node)):
+        assert index == 0
+        return ElementType.TENSOR
+    if isinstance(node, bn.MatrixScaleNode):
+        if index == 0:
+            return ElementType.SCALAR
+        if index == 1:
+            return ElementType.TENSOR
+        else:
+            raise ValueError(f"MatrixScale only has 2 inputs but index of {index} was provided")
+    else:
+        return ElementType.SCALAR
 
 _leaves = [
     bn.Query
@@ -58,11 +89,21 @@ _indexable_node_types = [
     bn.ConstantTensorNode,
     bn.IndexNode,
     bn.MatrixScaleNode,
+    bn.MatrixMultiplicationNode,
     bn.SampleNode,
     bn.TensorNode,
     bn.ToMatrixNode,
     bn.UntypedConstantNode,
 ]
+
+class DevectorizedNode:
+    def __init__(self, elements: List[bn.BMGNode], shape: Size):
+        self.elements: List[bn.BMGNode] = elements
+        self.size = shape
+        item_count = 1
+        for i in range(0, len(self.size)):
+            item_count *= self.size[i]
+        assert item_count == len(elements)
 
 # nodes in this category accept a single value argument
 def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
@@ -192,8 +233,9 @@ class BuilderContext:
             if len(original_node.inputs.inputs) > 2:
                 return None
             for parent in original_node.inputs.inputs:
-                if self._is_matrix(parent) and tensor_parent == None:
-                    tensor_parent = parent
+                if self._is_matrix(parent):
+                    if tensor_parent == None:
+                        tensor_parent = parent
                 elif scalar_parent == None:
                     scalar_parent = parent
             if not scalar_parent == None and not tensor_parent == None:
@@ -217,6 +259,7 @@ class BuilderContext:
                     return self.bmg.add_matrix_scale(scalar_parent, tensor_parent)
         return False
 
+
 def _is_fixable_size(s: Size) -> bool:
     dim = len(s)
     if dim == 1:
@@ -225,34 +268,76 @@ def _is_fixable_size(s: Size) -> bool:
         return s[0] > 1 or s[1] > 1
     return False
 
+# a node needs to be devectorized under one of the following conditions:
+# (1) if it MAY be devectorized AND there is a child that does NOT consume tensors.
+#     If the target MAY NOT be devectorized and the downstream operator does NOT consume tensors, we should error out.
+#     Although we could potentially resolve this by devectorizing above one level, we want to avoid full graph analysis for
+#     for each node at this time. I think it makes more sense to focus efforts on creating tensorized versions of all ops.
+# (2) if it MUST be devectorized (i.e. if it is an operator that does not have a tensor impl)
+# (3) if it MAY be devectorized AND the parents were devectorized
+# (This case is arguable so I only enforce this for Sample and Observation so that the test expectations remain unchanged)
+class DevectorizeTransformation(Enum):
+    YES = 1
+    YES_WITH_MERGE = 2
+    NO = 3
 
-def _needs_devectorize(node: bn.BMGNode, size: Size, cxt:BuilderContext) -> bool:
+
+
+
+def _needs_devectorize(node: bn.BMGNode, size: Size, cxt:BuilderContext) -> DevectorizeTransformation:
     is_eligible_for_devectorize = _is_fixable_size(size) and not _leaves.__contains__(type(node))
     if is_eligible_for_devectorize:
-        # I think sample and observations can be devectorized, but they do not have to be
-        if isinstance(node, bn.SampleNode):
-            if cxt.devectorized_nodes.__contains__(node.inputs.inputs[0]):
-                return True
+        # determine if it needs to be split because the parent was split but was not merged
+        has_split_requirement = False
+        for n in node.inputs.inputs:
+            only_devectorized_version_of_parent_available = cxt.devectorized_nodes.__contains__(n) and not (cxt.clones.__contains__(n))
+            if only_devectorized_version_of_parent_available:
+                has_split_requirement = True
+
+        # observations are leaves. We could create a tensor here to stuff into an observation but I'm
+        # going with the changes of least resistence (change as few test expectations as possible)
         if isinstance(node, bn.Observation):
-            if cxt.devectorized_nodes.__contains__(node.inputs.inputs[0]):
-                return True
+            if has_split_requirement:
+                return DevectorizeTransformation.YES
             else:
-                return False
+                return DevectorizeTransformation.NO
 
         # since the children of distribution nodes are devectorized depending on the parent,
         # do not check downstream nodes
+        # not that distributions cannot have merge requirements because their only children are samples
         if isinstance(node, bn.DistributionNode):
-            return not _consumes_tensor_types.__contains__(type(node))
+            if not _consumes_tensor_types.__contains__(type(node)):
+                return DevectorizeTransformation.YES
 
         # this is for operators and tensor nodes, where there could
         # if all downstream consumers either accept tensors or can be tensorized, then no need to devectorize
+        has_merge_requirement = False
         for consumer in node.outputs.items:
-            if not _consumes_tensor_types.__contains__(type(consumer)) and not cxt.can_be_tensorized(consumer):
-                return True
+            if not _consumes_tensor_types.__contains__(type(consumer)):
+                has_split_requirement = True
+            index_of_me = 0
+            k = 0
+            for producer in consumer.inputs.inputs:
+                if producer == node:
+                    index_of_me = k
+                    break
+                k = k + 1
+
+            if requires_element_type_at(consumer, index_of_me) == ElementType.TENSOR:
+                has_merge_requirement = True
         # if it reaches this point, it does not need to be vectorized because of downstream needs
-        return not _consumes_tensor_types.__contains__(type(node))
-    else:
-        return is_eligible_for_devectorize
+        # does it need to be devectorized because it is an unsupported tensor operator?
+        if not _consumes_tensor_types.__contains__(type(node)):
+            has_split_requirement = True
+
+        if has_split_requirement and has_merge_requirement:
+            return DevectorizeTransformation.YES_WITH_MERGE
+        if has_split_requirement:
+            return DevectorizeTransformation.YES
+        if has_merge_requirement:
+            return DevectorizeTransformation.NO
+
+    return DevectorizeTransformation.NO
 
 
 def _node_to_index_list(
@@ -270,7 +355,8 @@ def _node_to_index_list(
     # The practical upshot is: if we have, say, Size([3]) OR Size([1, 3])
     # then either way, we will have a one-column, three row BMG node, and
     # therefore we only need a single level of indexing.
-    n = _clone(node, size, cxt)
+    n = _clone(node, size, cxt, _clone_parents)
+    cxt.clones[node] = n
     if dim == 0:
         # If we have just a single value then there's no indexing required.
         index_list.append(n)
@@ -299,14 +385,7 @@ def _node_to_index_list(
     return index_list
 
 
-class DevectorizedNode:
-    def __init__(self, elements: List[bn.BMGNode], shape: Size):
-        self.elements: List[bn.BMGNode] = elements
-        self.size = shape
-        item_count = 1
-        for i in range(0, len(self.size)):
-            item_count *= self.size[i]
-        assert item_count == len(elements)
+
 
 
 def list_from_parents(
@@ -345,14 +424,39 @@ def list_from_parents_with_index(
     return elements
 
 
-def _clone_parents(node: bn.BMGNode, cxt: BuilderContext) -> List[bn.BMGNode]:
+def _clone_parents(node: bn.BMGNode, cxt: BuilderContext) -> List[typing.Union[bn.BMGNode, DevectorizedNode]]:
+    parents = []
+    j = 0
+    for p in node.inputs.inputs:
+        element_type_must_be_tensor = requires_element_type_at(node, j) == ElementType.TENSOR
+
+        if element_type_must_be_tensor:
+            if cxt.clones.__contains__(p):
+                parent = cxt.clones[p]
+                parents.append(parent)
+            else:
+                raise ValueError("encountered a value not in the clone context")
+        else:
+            parent_was_tensor = not is_scalar(cxt.sizer[p])
+            if parent_was_tensor:
+                if cxt.devectorized_nodes.__contains__(p):
+                    parents.append(cxt.devectorized_nodes[p])
+                else:
+                    raise ValueError("expected a parent to be devectorized")
+            else:
+                if cxt.clones.__contains__(p):
+                    parent = cxt.clones[p]
+                    parents.append(parent)
+                else:
+                    raise ValueError("encountered a value not in the clone context")
+        j = j + 1
+
+    return parents
+
+def _clone_parents_tensorize(node: bn.BMGNode, cxt: BuilderContext) -> List[typing.Union[bn.BMGNode, DevectorizedNode]]:
     parents = []
     for p in node.inputs.inputs:
-        if cxt.devectorized_nodes.__contains__(p):
-            elements = cxt.devectorized_nodes[p].elements
-            parent = cxt.bmg.add_tensor(cxt.devectorized_nodes[p].size, *elements)
-            parents.append(parent)
-        elif cxt.clones.__contains__(p):
+        if cxt.clones.__contains__(p):
             parent = cxt.clones[p]
             parents.append(parent)
         else:
@@ -360,8 +464,15 @@ def _clone_parents(node: bn.BMGNode, cxt: BuilderContext) -> List[bn.BMGNode]:
     return parents
 
 # we're given a node that we want to devectori
-def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext) -> bn.BMGNode:
-    parents = _clone_parents(node, cxt)
+def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext, parent_cloner:Callable[[bn.BMGNode, BuilderContext], List[typing.Union[bn.BMGNode, DevectorizedNode]]]) -> bn.BMGNode:
+    raw_parents = parent_cloner(node, cxt)
+    parents = []
+    for p in raw_parents:
+        if isinstance(p, DevectorizedNode):
+            tensor = cxt.bmg.add_tensor(p.size, *(p.elements))
+            parents.append(tensor)
+        else:
+            parents.append(p)
     if isinstance(node, bn.SampleNode):
         dist = parents[0]
         assert isinstance(dist, bn.DistributionNode)
@@ -387,72 +498,65 @@ def _clone(node: bn.BMGNode, size: Size, cxt: BuilderContext) -> bn.BMGNode:
         cxt.bmg.execution_context.record_node_call(new_node, site)
     return new_node
 
-
+# some nodes must be split because tensor versions of them are not available
+# others must be split because downstream nodes depend on them being split
 def split(node: bn.BMGNode, cxt: BuilderContext, size: Size) -> DevectorizedNode:
-    item_count = 1
-    for i in range(0, len(size)):
-        item_count *= size[i]
+    # if the output of the parent has become a scalar, then it is assumed that this node represents the scalar valued function, which means
+    # if it previously accepted a tensor it now accepts N scalars because of the parent split. We thus assume N copies of the node are needed,
+    # rather than a single copy that can be indexed.
+    is_sample_of_scalar_dist = isinstance(node, bn.SampleNode) and not _consumes_tensor_types.__contains__(node.operand)
+    not_indexable = not _indexable_node_types.__contains__(type(node))
+    if not_indexable or is_sample_of_scalar_dist:
+        item_count = 1
+        for i in range(0, len(size)):
+            item_count *= size[i]
 
-    # identify parents
-    parents = []
-    for input in node.inputs.inputs:
-        if cxt.devectorized_nodes.__contains__(input):
-            devectorized_parent = cxt.devectorized_nodes[input]
-            parents.append(devectorized_parent)
-        elif cxt.clones.__contains__(input):
-            parents.append(cxt.clones[input])
-        else:
-            raise ValueError("value not found in clone context")
-
-    if isinstance(node, bn.SampleNode):
-        new_nodes = list_from_parents(size, item_count, parents, cxt.bmg.add_sample)
-        return DevectorizedNode(new_nodes, size)
-    if _indexable_node_types.__contains__(type(node)):
-        return DevectorizedNode(_node_to_index_list(cxt, size, node), size)
-    if isinstance(node, bn.DistributionNode):
-        return DevectorizedNode(
-            list_from_parents(
-                size, item_count, parents, cxt.dist_factories[type(node)]
-            ),
-            size,
-        )
-    if isinstance(node, bn.Query):
-        return DevectorizedNode(
-            list_from_parents(size, item_count, parents, cxt.bmg.add_query), size
-        )
-    if isinstance(node, bn.OperatorNode):
-        return DevectorizedNode(
-            list_from_parents(
-                size, item_count, parents, cxt.node_factories[type(node)]
-            ),
-            size,
-        )
-    if isinstance(node, bn.Observation):
-        # TODO: What if the observation is of a different size than the
-        # tensor node we've just generated? That should be an error, but instead
-        # we just crash here. Figure out where to put an error detection pass
-        # which prevents this crash and reports the error.
-        dim = len(node.value.size())
-        values = []
-        if dim == 1:
-            for i in range(0, node.value.size()[0]):
-                values.append(node.value[i])
-        else:
-            assert dim == 2
-            for i in range(0, node.value.size()[0]):
-                for j in range(0, node.value.size()[1]):
-                    values.append(node.value[i][j])
-        return DevectorizedNode(
-            list_from_parents_with_index(
+        parents = _clone_parents(node, cxt)
+        if isinstance(node, bn.SampleNode):
+            new_nodes = list_from_parents(size, item_count, parents, cxt.bmg.add_sample)
+            return DevectorizedNode(new_nodes, size)
+        if isinstance(node, bn.DistributionNode):
+            return DevectorizedNode(
+                list_from_parents(
+                    size, item_count, parents, cxt.dist_factories[type(node)]
+                ),
                 size,
-                item_count,
-                parents,
-                lambda i, s: cxt.bmg.add_observation(*s, values[i]),
-            ),
-            size,
-        )
+            )
+        if isinstance(node, bn.OperatorNode):
+            return DevectorizedNode(
+                list_from_parents(
+                    size, item_count, parents, cxt.node_factories[type(node)]
+                ),
+                size,
+            )
+        if isinstance(node, bn.Observation):
+            # TODO: What if the observation is of a different size than the
+            # tensor node we've just generated? That should be an error, but instead
+            # we just crash here. Figure out where to put an error detection pass
+            # which prevents this crash and reports the error.
+            dim = len(node.value.size())
+            values = []
+            if dim == 1:
+                for i in range(0, node.value.size()[0]):
+                    values.append(node.value[i])
+            else:
+                assert dim == 2
+                for i in range(0, node.value.size()[0]):
+                    for j in range(0, node.value.size()[1]):
+                        values.append(node.value[i][j])
+            return DevectorizedNode(
+                list_from_parents_with_index(
+                    size,
+                    item_count,
+                    parents,
+                    lambda i, s: cxt.bmg.add_observation(*s, values[i]),
+                ),
+                size,
+            )
+        else:
+            raise NotImplementedError()
     else:
-        raise NotImplementedError()
+        return DevectorizedNode(_node_to_index_list(cxt, size, node), size)
 
 
 def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
@@ -474,7 +578,13 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
                 rhs_size = sizer[node.inputs.inputs[1]]
 
                 if not (is_scalar(lhs_size) or is_scalar(rhs_size)):
-                    if not (len(lhs_size) == 2 and len(rhs_size) == 2) or lhs_size[1] != rhs_size[0]:
+                    l_rhs = len(rhs_size)
+                    l_lhs = len(lhs_size)
+                    rhs_can_be_considered_column = l_rhs == 1 and l_lhs == 2 and lhs_size[1] == rhs_size[0]
+                    lhs_can_be_considered_row = l_lhs == 1 and l_rhs == 2 and lhs_size[0] == rhs_size[0]
+                    can_be_inner_product = l_rhs == 1 and l_lhs == 1 and rhs_size[0] == lhs_size[0]
+                    are_not_matrices_or_not_compatible_matrices = (not (len(lhs_size) == 2 and l_rhs == 2)) or (lhs_size[1] != rhs_size[0])
+                    if are_not_matrices_or_not_compatible_matrices and not (rhs_can_be_considered_column or lhs_can_be_considered_row or can_be_inner_product):
                         typer = beanmachine.ppl.compiler.lattice_typer.LatticeTyper()
                         # type and correct the types. We only care about dimensions so if the
                         # typer cannot type it we just add dummy values for element types that
@@ -498,7 +608,7 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
                 else:
                     raise ValueError("expected a node but tensorize creation failed")
             else:
-                cxt.clones[node] = _clone(node, sizer[node], cxt)
+                cxt.clones[node] = _clone(node, sizer[node], cxt, _clone_parents_tensorize)
         if tensorized_nodes_cnt > 0:
             return cxt.bmg, True, report
         else:
@@ -512,10 +622,23 @@ def vectorized_node_fixer(sizer: Sizer) -> GraphFixer:
         cxt = BuilderContext(bmg_old, sizer)
         report = ErrorReport()
         for node in bmg_old.all_nodes():
-            if _needs_devectorize(node, sizer[node], cxt):
-                cxt.devectorized_nodes[node] = split(node, cxt, sizer[node])
+            transform_type = _needs_devectorize(node, sizer[node], cxt)
+            if transform_type == DevectorizeTransformation.YES:
+                devectorized_node = split(node, cxt, sizer[node])
+                if is_scalar(devectorized_node.size):
+                    cxt.clones[node] = devectorized_node.elements[0]
+                else:
+                    cxt.devectorized_nodes[node] = devectorized_node
+            elif transform_type == DevectorizeTransformation.NO:
+                cxt.clones[node] = _clone(node, sizer[node], cxt, _clone_parents)
             else:
-                cxt.clones[node] = _clone(node, sizer[node], cxt)
+                assert transform_type == DevectorizeTransformation.YES_WITH_MERGE
+                devectorized_node = split(node, cxt, sizer[node])
+                els = devectorized_node.elements
+                tensor = cxt.bmg.add_tensor(devectorized_node.size, *els)
+                cxt.devectorized_nodes[node] = devectorized_node
+                cxt.clones[node] = tensor
+
         split_nodes_cnt = len(cxt.devectorized_nodes)
         if split_nodes_cnt > 0:
             return cxt.bmg, True, report
