@@ -28,20 +28,57 @@ from beanmachine.ppl.compiler.fix_problem import (
     sequential_graph_fixer,
 )
 from beanmachine.ppl.compiler.sizer import is_scalar, Sizer, Unsized
+
 class TransformAssessment:
     def __init__(self, needs_transform:bool, errors:ErrorReport):
         self.node_needs_transform = needs_transform
         self.error_report = errors
 
+def flatten(inputs:List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]) -> List[bn.BMGNode]:
+    parents = []
+    for input in inputs:
+        if input == None:
+            continue
+        if isinstance(input, List):
+            for i in input:
+                parents.append(i)
+        else:
+            parents.append(input)
+    return parents
 
+class Cloner:
+    def __init__(self, original:BMGraphBuilder):
+        self.bmg_original = original
+        self.bmg = BMGraphBuilder()
+        self.sizer = Sizer()
+        self.node_factories = _node_factories(self.bmg)
+        self.value_factories = _constant_factories(self.bmg)
 
-class NodeTransformer:
-    def assess_node(self, node:bn.BMGNode) -> TransformAssessment:
-        raise NotImplementedError("this is an abstract base class")
+    def clone(self, original:bn.BMGNode, inputs:List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]) -> bn.BMGNode:
+        parents = flatten(inputs)
+        if self.value_factories.__contains__(type(original)):
+            image = self.value_factories[type(original)](original.value)
+        elif isinstance(original, bn.Query):
+            assert len(parents) == 1
+            image = self.bmg.add_query(parents[0])
+            key = original
+            for k, v in self.bmg_original.query_map.items():
+                if v == original:
+                    key = k
+                    break
+            self.bmg.query_map[key] = image
+        elif isinstance(original, bn.Observation):
+            assert len(parents) == 1
+            image = self.bmg.add_observation(parents[0], original.value)
+        elif isinstance(original, bn.TensorNode):
+            image = self.bmg.add_tensor(self.sizer[original], *parents)
+        else:
+            image = self.node_factories[type(original)](*parents)
 
-    # a node is either replaced 1-1, 1-many, or deleted
-    def transform_node(self, node:bn.BMGNode, new_inputs:List[bn.BMGNode]) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
-        raise NotImplementedError("this is an abstract base class")
+        locations = self.bmg_original.execution_context.node_locations(original)
+        for site in locations:
+            self.bmg.execution_context.record_node_call(image, site)
+        return image
 
 def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     return {
@@ -134,61 +171,32 @@ def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.UntypedConstantNode: bmg.add_constant,
     }
 
-def flatten(inputs:List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]) -> List[bn.BMGNode]:
-    parents = []
-    for input in inputs:
-        if input == None:
-            continue
-        if isinstance(input, List):
-            for i in input:
-                parents.append(i)
-        else:
-            parents.append(input)
-    return parents
+class NodeTransformer:
+    def assess_node(self, node:bn.BMGNode, sizer:Sizer, original: BMGraphBuilder) -> TransformAssessment:
+        raise NotImplementedError("this is an abstract base class")
+
+    # a node is either replaced 1-1, 1-many, or deleted
+    def transform_node(self, node:bn.BMGNode, new_inputs:List[bn.BMGNode], cloner:Cloner) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
+        raise NotImplementedError("this is an abstract base class")
 
 def copy_and_replace(bmg_original:BMGraphBuilder, transformer:NodeTransformer) -> typing.Tuple[BMGraphBuilder, ErrorReport]:
-    original_context = bmg_original.execution_context
-    bmg = BMGraphBuilder()
-    sizer = Sizer()
-    node_factories = _node_factories(bmg)
-    value_factories = _constant_factories(bmg)
-
+    cloner = Cloner(bmg_original)
     copies = {}
-    for index, original in enumerate(bmg.all_nodes()):
+    for original in bmg_original.all_nodes():
         inputs = []
         for c in original.inputs.inputs:
             inputs.append(copies[c])
-        assessment = transformer.assess_node(original)
-        if len(assessment.error_report.errors) > 0:
-            return bmg, assessment.error_report
-        elif assessment.node_needs_transform:
-            image = transformer.transform_node(original, inputs)
-            copies[original] = image
-        else:
-            parents = flatten(inputs)
-            if value_factories.__contains__(type(original)):
-                image = node_factories[type(original)](original.value)
-            if isinstance(original, bn.Query):
-                assert len(parents) == 1
-                image = bmg.add_query(parents[0])
-                key = original
-                for k, v in bmg_original.query_map.items():
-                    if v == original:
-                        key = k
-                        break
-                bmg.query_map[key] = image
-            elif isinstance(original, bn.Observation):
-                assert len(parents) == 1
-                image = bmg.add_observation(parents[0], original.value)
-            elif isinstance(original, bn.TensorNode):
-                image = bmg.add_tensor(sizer[original], *parents)
-            else:
-                image = node_factories[type(original)](*parents)
+        assessment = transformer.assess_node(original, cloner.sizer, cloner.bmg_original)
 
-            copies[original] = image
-            locations = original_context.node_locations(original)
-            for site in locations:
-                bmg.execution_context.record_node_call(image, site)
+        if len(assessment.error_report.errors) > 0:
+            return cloner.bmg, assessment.error_report
+        elif assessment.node_needs_transform:
+            image = transformer.transform_node(original, inputs, cloner)
+        else:
+            image = cloner.clone(original, inputs)
+        copies[original] = image
+    return cloner.bmg, ErrorReport()
+
 
 
 

@@ -393,9 +393,6 @@ def _node_to_index_list(
     return index_list
 
 
-
-
-
 def list_from_parents(
     size: Size, item_count: int, parents: [], creator: Callable
 ) -> List[bn.BMGNode]:
