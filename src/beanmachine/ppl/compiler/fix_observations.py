@@ -16,7 +16,6 @@ from beanmachine.ppl.compiler.bmg_types import (
     Untypable,
 )
 from beanmachine.ppl.compiler.error_report import ErrorReport, ImpossibleObservation
-from beanmachine.ppl.compiler.fix_problem import GraphFixer
 from beanmachine.ppl.compiler.lattice_typer import LatticeTyper
 
 

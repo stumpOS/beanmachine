@@ -17,7 +17,6 @@ from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.bmg_node_types import is_supported_by_bmg
 from beanmachine.ppl.compiler.bmg_requirements import EdgeRequirements
 from beanmachine.ppl.compiler.error_report import ErrorReport, Violation
-from beanmachine.ppl.compiler.fix_problem import GraphFixer
 from beanmachine.ppl.compiler.graph_labels import get_edge_labels
 from beanmachine.ppl.compiler.internal_error import InternalError
 from beanmachine.ppl.compiler.lattice_typer import LatticeTyper

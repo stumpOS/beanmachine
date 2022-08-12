@@ -17,7 +17,7 @@ from beanmachine.ppl.compiler.bmg_nodes import (
 )
 from beanmachine.ppl.compiler.bmg_types import is_one
 from beanmachine.ppl.compiler.error_report import ErrorReport
-from beanmachine.ppl.compiler.fix_problem import GraphFixer, GraphFixerResult
+from beanmachine.ppl.compiler.fix_problem import GraphFixerResult
 
 
 def _is_conversion(n: BMGNode) -> bool:
