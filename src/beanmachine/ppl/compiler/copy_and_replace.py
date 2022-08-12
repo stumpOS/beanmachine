@@ -54,8 +54,7 @@ class Cloner:
         self.node_factories = _node_factories(self.bmg)
         self.value_factories = _constant_factories(self.bmg)
 
-    def clone(self, original:bn.BMGNode, inputs:List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]) -> bn.BMGNode:
-        parents = flatten(inputs)
+    def clone(self, original:bn.BMGNode, parents:List[bn.BMGNode]) -> bn.BMGNode:
         if self.value_factories.__contains__(type(original)):
             image = self.value_factories[type(original)](original.value)
         elif isinstance(original, bn.Query):
@@ -172,28 +171,30 @@ def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     }
 
 class NodeTransformer:
-    def assess_node(self, node:bn.BMGNode, sizer:Sizer, original: BMGraphBuilder) -> TransformAssessment:
+    def assess_node(self, node:bn.BMGNode, original: BMGraphBuilder) -> TransformAssessment:
         raise NotImplementedError("this is an abstract base class")
 
     # a node is either replaced 1-1, 1-many, or deleted
-    def transform_node(self, node:bn.BMGNode, new_inputs:List[bn.BMGNode], cloner:Cloner) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
+    def transform_node(self, node:bn.BMGNode, new_inputs:List[bn.BMGNode]) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
         raise NotImplementedError("this is an abstract base class")
 
-def copy_and_replace(bmg_original:BMGraphBuilder, transformer:NodeTransformer) -> typing.Tuple[BMGraphBuilder, ErrorReport]:
+def copy_and_replace(bmg_original:BMGraphBuilder, transformer_creator:Callable[[Cloner, Sizer], NodeTransformer]) -> typing.Tuple[BMGraphBuilder, ErrorReport]:
     cloner = Cloner(bmg_original)
+    transformer = transformer_creator(cloner, cloner.sizer)
     copies = {}
     for original in bmg_original.all_nodes():
         inputs = []
         for c in original.inputs.inputs:
             inputs.append(copies[c])
-        assessment = transformer.assess_node(original, cloner.sizer, cloner.bmg_original)
+        assessment = transformer.assess_node(original, cloner.bmg_original)
 
         if len(assessment.error_report.errors) > 0:
             return cloner.bmg, assessment.error_report
         elif assessment.node_needs_transform:
-            image = transformer.transform_node(original, inputs, cloner)
+            image = transformer.transform_node(original, inputs)
         else:
-            image = cloner.clone(original, inputs)
+            parents = flatten(inputs)
+            image = cloner.clone(original, parents)
         copies[original] = image
     return cloner.bmg, ErrorReport()
 
