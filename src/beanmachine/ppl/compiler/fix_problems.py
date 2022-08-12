@@ -118,9 +118,7 @@ def fix_problems(
 
     all_fixers = sequential_graph_fixer(
         [
-            conditional_graph_fixer(
-                condition=lambda gb: gb._devectorize, fixer=vectorized_graph_fixer()
-            ),
+            vectorized_graph_fixer(),
             arithmetic_graph_fixer(skip_optimizations),
             unsupported_node_reporter(),
             bad_matmul_reporter(),
