@@ -6,7 +6,7 @@ import unittest
 
 import beanmachine.ppl as bm
 from beanmachine.ppl.compiler.copy_and_replace import copy_and_replace
-from beanmachine.ppl.compiler.devector_transformer import Devectorizer
+from beanmachine.ppl.compiler.devectorizer_transformer import Devectorizer
 from beanmachine.ppl.compiler.gen_dot import to_dot
 from beanmachine.ppl.compiler.runtime import BMGRuntime
 from torch import mm, tensor
