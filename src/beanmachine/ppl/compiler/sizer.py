@@ -75,12 +75,15 @@ Scalar = Size([])
 
 # These nodes are always scalars no matter what their input:
 _always_scalar: Set[type] = {
+    bn.CategoricalNode,
+    bn.CategoricalLogitNode,
     bn.ExpProductFactorNode,
     bn.FlatNode,
     bn.InNode,
     bn.IsNode,
     bn.IsNotNode,
     bn.ItemNode,
+    bn.LogSumExpVectorNode,
     bn.NotInNode,
     bn.NotNode,
     bn.SumNode,
@@ -150,7 +153,6 @@ _broadcast_the_inputs: Set[type] = {
     bn.UniformNode,
     bn.TransposeNode,
 }
-
 
 def _broadcast_two(x: Size, y: Size) -> Size:
     # Given two sizes, what is their broadcast size, if any?  Rather than replicate
@@ -307,6 +309,21 @@ class Sizer(TyperBase[Size]):
             if isinstance(node.value, torch.Tensor):
                 return node.value.size()
             return Scalar
+        if isinstance(node, bn.ColumnIndexNode):
+            size_tensor = self[node.inputs.inputs[0]]
+            # column size is always the last value of the shape since its the inner most group
+            return Size([size_tensor[len(size_tensor)-1]])
+        if isinstance(node, bn.LogSumExpVectorNode):
+            # this expects a tensor and evaluates along rows
+            operand_size = self[node.operand]
+            dim = len(operand_size)
+            if dim <= 1:
+                return Scalar
+            else:
+                dims = []
+                for d in range(0, dim - 1):
+                    dims.append(operand_size[d])
+                return Size(dims)
         if hasattr(node, "_size"):
             return node._size  # pyre-ignore
         t = type(node)

@@ -10,7 +10,7 @@ from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.gen_bmg_cpp import to_bmg_cpp
 from beanmachine.ppl.compiler.gen_bmg_graph import to_bmg_graph
 from beanmachine.ppl.compiler.gen_bmg_python import to_bmg_python
-from beanmachine.ppl.compiler.gen_dot import to_dot
+from beanmachine.ppl.compiler.gen_dot import to_dot, to_dot_get_graph
 from beanmachine.ppl.compiler.runtime import BMGRuntime
 from torch import tensor
 from torch.distributions import Normal
@@ -49,7 +49,7 @@ class ToMatrixTest(unittest.TestCase):
     def test_to_matrix_1by2(self) -> None:
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([f1by2()], {})
-        observed = to_dot(
+        bmg, observed = to_dot_get_graph(
             bmg,
             node_types=True,
             edge_requirements=True,
@@ -161,7 +161,7 @@ digraph "graph" {
     def test_to_matrix_2by1(self) -> None:
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([f2by1()], {})
-        observed = to_dot(
+        bmg, observed = to_dot_get_graph(
             bmg,
             node_types=True,
             edge_requirements=True,
@@ -347,7 +347,7 @@ digraph "graph" {
         bmg.add_query(lse0)
         bmg.add_query(lse1)
 
-        observed = to_dot(
+        bmg, observed = to_dot_get_graph(
             bmg,
             node_types=True,
             edge_requirements=True,
