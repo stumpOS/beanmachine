@@ -5,32 +5,67 @@
 import unittest
 
 import beanmachine.ppl as bm
-from beanmachine.ppl.compiler.gen_dot import to_dot
-from beanmachine.ppl.compiler.runtime import BMGRuntime
-from torch import tensor
-from torch.distributions import Normal, Gamma, HalfCauchy, StudentT, Bernoulli
 from beanmachine.ppl.compiler.copy_and_replace import copy_and_replace
 from beanmachine.ppl.compiler.devector_transformer import Devectorizer
-from torch import mm
-
+from beanmachine.ppl.compiler.gen_dot import to_dot
+from beanmachine.ppl.compiler.runtime import BMGRuntime
+from torch import mm, tensor
+from torch.distributions import Bernoulli, Gamma, HalfCauchy, Normal, StudentT
 
 
 @bm.random_variable
 def norm_tensor(n):
     return Normal(tensor([0.0, 0.5]), tensor([0.6, 1.0]))
 
+
 class DevectorizeTransformerTest(unittest.TestCase):
     def test_needs_transform_because_parent_cannot_be_merged(self) -> None:
         self.maxDiff = None
-        bmg = BMGRuntime().accumulate_graph([norm_tensor()], {})
-        transformed_graph, error_report = copy_and_replace(bmg, lambda c,s:Devectorizer(c,s))
+        bmg = BMGRuntime().accumulate_graph([norm_tensor(0)], {})
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Devectorizer(c, s)
+        )
         observed = to_dot(transformed_graph)
         expected = """
+digraph "graph" {
+  N00[label="[0.0,0.5]"];
+  N01[label=0];
+  N02[label=index];
+  N03[label="[0.6000000238418579,1.0]"];
+  N04[label=index];
+  N05[label=Normal];
+  N06[label=Sample];
+  N07[label=1];
+  N08[label=index];
+  N09[label=index];
+  N10[label=Normal];
+  N11[label=Sample];
+  N12[label=Tensor];
+  N13[label=Query];
+  N00 -> N02[label=left];
+  N00 -> N08[label=left];
+  N01 -> N02[label=right];
+  N01 -> N04[label=right];
+  N02 -> N05[label=mu];
+  N03 -> N04[label=left];
+  N03 -> N09[label=left];
+  N04 -> N05[label=sigma];
+  N05 -> N06[label=operand];
+  N06 -> N12[label=left];
+  N07 -> N08[label=right];
+  N07 -> N09[label=right];
+  N08 -> N10[label=mu];
+  N09 -> N10[label=sigma];
+  N10 -> N11[label=operand];
+  N11 -> N12[label=right];
+  N12 -> N13[label=operator];
+}
         """
         self.assertEqual(expected.strip(), observed.strip())
 
     def test_transform_multiple_operands(self) -> None:
         _y_obs = tensor([33.3, 68.3])
+
         @bm.random_variable
         def sigma_out():
             return Gamma(1, 1)
@@ -43,7 +78,9 @@ class DevectorizeTransformerTest(unittest.TestCase):
 
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([multiple_operands()], {})
-        transformed_graph, error_report = copy_and_replace(bmg, lambda c,s:Devectorizer(c,s))
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Devectorizer(c, s)
+        )
         observed = to_dot(transformed_graph)
         expected = """
 digraph "graph" {
@@ -111,9 +148,12 @@ digraph "graph" {
         @bm.functional
         def foo():
             return mm(tensor([2.0, 7.5]), norm_tensor(0))
+
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([foo()], {})
-        transformed_graph, error_report = copy_and_replace(bmg, lambda c,s:Devectorizer(c,s))
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Devectorizer(c, s)
+        )
         observed = to_dot(transformed_graph)
         expected = """
         digraph "graph" {
@@ -178,7 +218,9 @@ digraph "graph" {
 
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([studentt_2_3()], {})
-        transformed_graph, error_report = copy_and_replace(bmg, lambda c,s:Devectorizer(c,s))
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Devectorizer(c, s)
+        )
         observed = to_dot(transformed_graph)
         expected = """
         digraph "graph" {
@@ -187,7 +229,7 @@ digraph "graph" {
   N02[label=index];
   N03[label=HalfCauchy];
   N04[label=Sample];
-  N05[label="[[0.25,0.75,0.5],\\n[0.125,0.875,0.625]]"];
+  N05[label="[[0.25,0.75,0.5],\\\\n[0.125,0.875,0.625]]"];
   N06[label=index];
   N07[label=index];
   N08[label=Bernoulli];
@@ -351,6 +393,7 @@ digraph "graph" {
         # what the log prob of a tensor of size 3 is with respect to a distribution
         # whose samples are of size 2.
         _y_obs = tensor([33.3, 68.3, 6.7])
+
         @bm.random_variable
         def sigma_out():
             return Gamma(1, 1)
@@ -363,7 +406,9 @@ digraph "graph" {
 
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([unsizable()], {})
-        transformed_graph, error_report = copy_and_replace(bmg, lambda c,s:Devectorizer(c,s))
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Devectorizer(c, s)
+        )
         if len(error_report.errors) == 1:
             error = error_report.errors[0].__str__()
             expected = """
@@ -372,5 +417,6 @@ The unsizable node was created in function call unsizable().
             """
             self.assertEqual(error.strip(), expected.strip())
         else:
-            self.fail("A single error message should have been generated since the sizer cannot size every node")
-
+            self.fail(
+                "A single error message should have been generated since the sizer cannot size every node"
+            )

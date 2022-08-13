@@ -5,45 +5,55 @@
 import unittest
 
 import beanmachine.ppl as bm
+from beanmachine.ppl.compiler.copy_and_replace import copy_and_replace
 from beanmachine.ppl.compiler.gen_dot import to_dot
 from beanmachine.ppl.compiler.runtime import BMGRuntime
-from torch import tensor
-from torch.distributions import Normal
-from beanmachine.ppl.compiler.copy_and_replace import copy_and_replace
 from beanmachine.ppl.compiler.tensorize_transformer import Tensorizer
-from torch import mm
+from torch import mm, tensor
+from torch.distributions import Normal
+
 
 @bm.random_variable
 def norm(n):
     return Normal(tensor(0.0), tensor(1.0))
 
+
 @bm.functional
 def make_matrix(n):
     return tensor([[norm(n), norm(n)], [norm(n), 1.25]])
 
+
 @bm.functional
 def make_tensor(n):
-    return tensor([[[norm(n), norm(n)], [norm(n), 2.35]], [[norm(n), norm(n)], [norm(n), 1.25]]])
+    return tensor(
+        [[[norm(n), norm(n)], [norm(n), 2.35]], [[norm(n), norm(n)], [norm(n), 1.25]]]
+    )
+
 
 @bm.functional
 def matrix_scale_lhs():
     return make_matrix(1) * norm(2)
 
+
 @bm.functional
 def matrix_scale_rhs():
     return norm(1) * make_matrix(2)
+
 
 @bm.functional
 def scalar_mult():
     return norm(1) * norm(2)
 
+
 @bm.functional
 def non_matrix_tensor_mult_lhs():
     return make_tensor(1) * norm(2)
 
+
 @bm.functional
 def non_matrix_tensor_mult_rhs():
     return norm(2) * make_tensor(1)
+
 
 @bm.functional
 def mm_mismatch():
@@ -53,8 +63,12 @@ def mm_mismatch():
 class TensorizeTransformerTest(unittest.TestCase):
     def test_transformed(self) -> None:
         self.maxDiff = None
-        bmg = BMGRuntime().accumulate_graph([matrix_scale_rhs(), matrix_scale_lhs()], {})
-        transformed_graph, error_report = copy_and_replace(bmg, lambda c,s:Tensorizer(c,s))
+        bmg = BMGRuntime().accumulate_graph(
+            [matrix_scale_rhs(), matrix_scale_lhs()], {}
+        )
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Tensorizer(c, s)
+        )
         observed = to_dot(transformed_graph)
         expected = """
 digraph "graph" {
@@ -94,8 +108,13 @@ digraph "graph" {
 
     def test_not_transformed(self) -> None:
         self.maxDiff = None
-        bmg = BMGRuntime().accumulate_graph([scalar_mult(), non_matrix_tensor_mult_lhs(), non_matrix_tensor_mult_rhs()], {})
-        transformed_graph, error_report = copy_and_replace(bmg, lambda c,s:Tensorizer(c,s))
+        bmg = BMGRuntime().accumulate_graph(
+            [scalar_mult(), non_matrix_tensor_mult_lhs(), non_matrix_tensor_mult_rhs()],
+            {},
+        )
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Tensorizer(c, s)
+        )
         observed = to_dot(transformed_graph)
         expected = """
 digraph "graph" {
@@ -143,7 +162,9 @@ digraph "graph" {
         # this case verifies that even if there is nothing replacable it will error out because the errors
         # in this graph prevent even checking whether this graph can be tensorized
         bmg = BMGRuntime().accumulate_graph([mm_mismatch()], {})
-        transformed_graph, error_report = copy_and_replace(bmg, lambda c,s:Tensorizer(c,s))
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Tensorizer(c, s)
+        )
         if len(error_report.errors) == 1:
             error = error_report.errors[0].__str__()
             expected = """
@@ -153,6 +174,6 @@ The unsupported node was created in function call mm_mismatch().
             """
             self.assertEqual(expected.strip(), error.strip())
         else:
-            self.fail("A single error message should have been generated. Tensorizing depends on sizing and a size cannot be inferred from an operation whose operand sizes are invalid.")
-
-
+            self.fail(
+                "A single error message should have been generated. Tensorizing depends on sizing and a size cannot be inferred from an operation whose operand sizes are invalid."
+            )

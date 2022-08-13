@@ -4,27 +4,31 @@
 # LICENSE file in the root directory of this source tree.
 import math
 import typing
-from typing import Callable, Dict, List, Type
 from enum import Enum
+from typing import Callable, Dict, List, Type
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
 import beanmachine.ppl.compiler.bmg_types
 import beanmachine.ppl.compiler.broadcast
 import beanmachine.ppl.compiler.copy_and_replace
-import beanmachine.ppl.compiler.tensorize_transformer
 import beanmachine.ppl.compiler.execution_context
 import beanmachine.ppl.compiler.lattice_typer
+import beanmachine.ppl.compiler.tensorize_transformer
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
+from beanmachine.ppl.compiler.copy_and_replace import (
+    Cloner,
+    copy_and_replace,
+    NodeTransformer,
+    TransformAssessment,
+)
 from beanmachine.ppl.compiler.error_report import ErrorReport, UnsizableNode
 from beanmachine.ppl.compiler.fix_problem import (
     GraphFixer,
     GraphFixerResult,
     sequential_graph_fixer,
 )
+from beanmachine.ppl.compiler.sizer import is_scalar, Size, Sizer, Unsized
 from beanmachine.ppl.compiler.tensorize_transformer import Tensorizer
-from beanmachine.ppl.compiler.copy_and_replace import NodeTransformer, copy_and_replace, TransformAssessment, Cloner
-from beanmachine.ppl.compiler.sizer import is_scalar, Sizer, Unsized, Size
-from beanmachine.ppl.compiler.copy_and_replace import NodeTransformer, copy_and_replace, TransformAssessment
 
 _unary_tensor_ops = [
     bn.LogSumExpNode,
@@ -33,19 +37,16 @@ _unary_tensor_ops = [
     bn.TransposeNode,
     bn.ToPositiveRealMatrixNode,
     bn.ToRealMatrixNode,
-    bn.CholeskyNode
+    bn.CholeskyNode,
 ]
 
 _tensor_constants = [
     bn.ConstantPositiveRealMatrixNode,
     bn.ConstantTensorNode,
-    bn.UntypedConstantNode
+    bn.UntypedConstantNode,
 ]
 
-_tensor_valued_distributions = [
-    bn.CategoricalNode,
-    bn.DirichletNode
-]
+_tensor_valued_distributions = [bn.CategoricalNode, bn.DirichletNode]
 
 _indexable_node_types = [
     bn.ColumnIndexNode,
@@ -59,10 +60,12 @@ _indexable_node_types = [
     bn.UntypedConstantNode,
 ]
 
+
 class ElementType(Enum):
     TENSOR = 1
     SCALAR = 2
     ANY = 3
+
 
 class DevectorizeTransformation(Enum):
     YES = 1
@@ -70,9 +73,9 @@ class DevectorizeTransformation(Enum):
     NO = 3
 
 
-
 def _size_is_devectorizable(s: Size) -> bool:
     return s != Unsized and not is_scalar(s)
+
 
 class CopyContext:
     def __init__(self):
@@ -81,7 +84,7 @@ class CopyContext:
 
 
 class Devectorizer(NodeTransformer):
-    def __init__(self, cloner:Cloner, sizer:Sizer):
+    def __init__(self, cloner: Cloner, sizer: Sizer):
         self.copy_context = CopyContext()
         self.cloner = cloner
         self.sizer = sizer
@@ -120,22 +123,30 @@ class Devectorizer(NodeTransformer):
             if index == 1:
                 return ElementType.TENSOR
             else:
-                raise ValueError(f"MatrixScale only has 2 inputs but index of {index} was provided")
+                raise ValueError(
+                    f"MatrixScale only has 2 inputs but index of {index} was provided"
+                )
         else:
             return ElementType.SCALAR
 
     def __needs_devectorize(self, node: bn.BMGNode) -> DevectorizeTransformation:
         size = self.sizer[node]
-        is_eligible_for_devectorize = _size_is_devectorizable(size) and not isinstance(node, bn.Query)
+        is_eligible_for_devectorize = _size_is_devectorizable(size) and not isinstance(
+            node, bn.Query
+        )
         if is_eligible_for_devectorize:
             # Determine if it needs to be split because the parent was split but could not be merged.
             # this is the case for example with a tensor version of normal. Suppose we draw a sample and that sample is the
             # operand to a matrix multiply. The sample doesn't need to be split because it doesn't consume tensors...it needs
             # to be split because its parent is no longer a tensor and cannot be a tensor
             def operand_is_no_longer_tensor(n: bn.BMGNode) -> bool:
-                return self.copy_context.devectorized_nodes.__contains__(n) and not (self.copy_context.clones.__contains__(n))
+                return self.copy_context.devectorized_nodes.__contains__(n) and not (
+                    self.copy_context.clones.__contains__(n)
+                )
 
-            has_upstream_scatter_requirement = any(operand_is_no_longer_tensor(o) for o in node.inputs.inputs)
+            has_upstream_scatter_requirement = any(
+                operand_is_no_longer_tensor(o) for o in node.inputs.inputs
+            )
 
             # observations are leaves. We could create a tensor here to stuff into an observation but I'm
             # going with the changes of least resistance (change as few test expectations as possible)
@@ -155,7 +166,11 @@ class Devectorizer(NodeTransformer):
             has_merge_requirement = False
             has_downstream_scatter_requirement = False
             for consumer in node.outputs.items:
-                index_of_me = next(i for i, producer in enumerate(consumer.inputs.inputs) if producer == node)
+                index_of_me = next(
+                    i
+                    for i, producer in enumerate(consumer.inputs.inputs)
+                    if producer == node
+                )
                 required_type = self.__requires_element_type_at(consumer, index_of_me)
                 if required_type == ElementType.TENSOR:
                     has_merge_requirement = True
@@ -164,8 +179,15 @@ class Devectorizer(NodeTransformer):
 
             # it's possible that both tensor and scatter versions of the operands exist,
             # but we can't use it because a tensorized version of the op this node represents is unsupported
-            node_does_not_support_tensors = all(self.__requires_element_type_at(o, i) == ElementType.SCALAR for i, o in enumerate(node.inputs.inputs)) and not _tensor_constants.__contains__(type(node))
-            needs_devectorize = has_upstream_scatter_requirement or node_does_not_support_tensors or has_downstream_scatter_requirement
+            node_does_not_support_tensors = all(
+                self.__requires_element_type_at(o, i) == ElementType.SCALAR
+                for i, o in enumerate(node.inputs.inputs)
+            ) and not _tensor_constants.__contains__(type(node))
+            needs_devectorize = (
+                has_upstream_scatter_requirement
+                or node_does_not_support_tensors
+                or has_downstream_scatter_requirement
+            )
             if needs_devectorize and has_merge_requirement:
                 return DevectorizeTransformation.YES_WITH_MERGE
             if needs_devectorize:
@@ -175,7 +197,9 @@ class Devectorizer(NodeTransformer):
 
         return DevectorizeTransformation.NO
 
-    def __get_clone_parents(self, node: bn.BMGNode) -> List[typing.Union[bn.BMGNode, List[bn.BMGNode]]]:
+    def __get_clone_parents(
+        self, node: bn.BMGNode
+    ) -> List[typing.Union[bn.BMGNode, List[bn.BMGNode]]]:
         parents = []
         for j, p in enumerate(node.inputs.inputs):
             sz = self.sizer[p]
@@ -185,8 +209,12 @@ class Devectorizer(NodeTransformer):
                 parent_was_tensor = not is_scalar(sz)
 
             required_element_type = self.__requires_element_type_at(node, j)
-            needs_clone = required_element_type != ElementType.SCALAR or (not parent_was_tensor and required_element_type == ElementType.SCALAR)
-            needs_devectorized = required_element_type == ElementType.SCALAR and parent_was_tensor
+            needs_clone = required_element_type != ElementType.SCALAR or (
+                not parent_was_tensor and required_element_type == ElementType.SCALAR
+            )
+            needs_devectorized = (
+                required_element_type == ElementType.SCALAR and parent_was_tensor
+            )
             if needs_clone:
                 if self.copy_context.clones.__contains__(p):
                     parents.append(self.copy_context.clones[p])
@@ -212,15 +240,13 @@ class Devectorizer(NodeTransformer):
                 raise ValueError("a unit parent was not found")
         return parents
 
-    def __flatten_parents(self,
-            nd:bn.BMGNode, parents: [], creator: Callable
+    def __flatten_parents(
+        self, nd: bn.BMGNode, parents: [], creator: Callable
     ) -> List[bn.BMGNode]:
-        return self.__flatten_parents_with_index(
-            nd, parents, lambda i, s: creator(*s)
-        )
+        return self.__flatten_parents_with_index(nd, parents, lambda i, s: creator(*s))
 
-    def __flatten_parents_with_index(self,
-            node:bn.BMGNode, parents: [], creator: Callable
+    def __flatten_parents_with_index(
+        self, node: bn.BMGNode, parents: [], creator: Callable
     ) -> List[bn.BMGNode]:
         size = self.sizer[node]
         item_count = 1
@@ -231,7 +257,9 @@ class Devectorizer(NodeTransformer):
         for i, parent in enumerate(parents):
             if isinstance(parent, List):
                 input_size = self.sizer[node.inputs.inputs[i]]
-                broadbast_fnc_maybe = beanmachine.ppl.compiler.broadcast.broadcast_fnc(input_size, size)
+                broadbast_fnc_maybe = beanmachine.ppl.compiler.broadcast.broadcast_fnc(
+                    input_size, size
+                )
                 if isinstance(broadbast_fnc_maybe, Callable):
                     broadcast[i] = broadbast_fnc_maybe
                 else:
@@ -251,14 +279,12 @@ class Devectorizer(NodeTransformer):
             elements.append(new_node)
         return elements
 
-    def _clone(self, node:bn.BMGNode) -> bn.BMGNode:
+    def _clone(self, node: bn.BMGNode) -> bn.BMGNode:
         n = self.cloner.clone(node, self.__get_clone_parents_flat(node))
         self.copy_context.clones[node] = n
         return n
 
-    def __split(self,
-            node: bn.BMGNode
-    ) -> List[bn.BMGNode]:
+    def __split(self, node: bn.BMGNode) -> List[bn.BMGNode]:
         size = self.sizer[node]
         dim = len(size)
         index_list = []
@@ -303,12 +329,14 @@ class Devectorizer(NodeTransformer):
     def __scatter(self, node: bn.BMGNode) -> List[bn.BMGNode]:
         parents = self.__get_clone_parents(node)
         if isinstance(node, bn.SampleNode):
-            new_nodes = self.__flatten_parents(node, parents, self.cloner.bmg.add_sample)
+            new_nodes = self.__flatten_parents(
+                node, parents, self.cloner.bmg.add_sample
+            )
             return new_nodes
         if isinstance(node, bn.OperatorNode) or isinstance(node, bn.DistributionNode):
             return self.__flatten_parents(
-                    node, parents, self.cloner.node_factories[type(node)]
-                )
+                node, parents, self.cloner.node_factories[type(node)]
+            )
         if isinstance(node, bn.Observation):
             dim = len(node.value.size())
             values = []
@@ -321,31 +349,39 @@ class Devectorizer(NodeTransformer):
                     for j in range(0, node.value.size()[1]):
                         values.append(node.value[i][j])
             return self.__flatten_parents_with_index(
-                    node,
-                    parents,
-                    lambda i, s: self.cloner.bmg.add_observation(*s, values[i]),
-                )
+                node,
+                parents,
+                lambda i, s: self.cloner.bmg.add_observation(*s, values[i]),
+            )
         else:
             raise NotImplementedError()
 
     def _devectorize(self, node: bn.BMGNode) -> List[bn.BMGNode]:
         # there are two ways to devectorize a node: (1) we can scatter it or (2) we can split it (clone and index)
-        is_sample_of_scalar_dist = isinstance(node, bn.SampleNode) and not _tensor_valued_distributions.__contains__(node.operand)
+        is_sample_of_scalar_dist = isinstance(
+            node, bn.SampleNode
+        ) and not _tensor_valued_distributions.__contains__(node.operand)
         not_indexable = not _indexable_node_types.__contains__(type(node))
         if not_indexable or is_sample_of_scalar_dist:
             return self.__scatter(node)
         else:
             return self.__split(node)
 
-    def assess_node(self, node:bn.BMGNode, original: BMGraphBuilder) -> TransformAssessment:
+    def assess_node(
+        self, node: bn.BMGNode, original: BMGraphBuilder
+    ) -> TransformAssessment:
         if self.sizer[node] == Unsized:
             report = ErrorReport()
-            report.add_error(UnsizableNode(node, original.execution_context.node_locations(node)))
+            report.add_error(
+                UnsizableNode(node, original.execution_context.node_locations(node))
+            )
             return TransformAssessment(needs_transform=False, errors=report)
         return TransformAssessment(needs_transform=True, errors=ErrorReport())
 
     # a node is either replaced 1-1, 1-many, or deleted
-    def transform_node(self, node:bn.BMGNode, new_inputs:List[bn.BMGNode]) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
+    def transform_node(
+        self, node: bn.BMGNode, new_inputs: List[bn.BMGNode]
+    ) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
         transform_type = self.__needs_devectorize(node)
         if transform_type == DevectorizeTransformation.YES:
             image = self._devectorize(node)
@@ -361,18 +397,19 @@ class Devectorizer(NodeTransformer):
                 self.copy_context.clones[node] = tensor
             image = self.copy_context.clones[node]
         else:
-            raise NotImplementedError("a new type of transformation type was introduced but never implemented")
+            raise NotImplementedError(
+                "a new type of transformation type was introduced but never implemented"
+            )
         return image
 
 
-
 def vectorized_graph_fixer() -> GraphFixer:
-    def _tensorize(bmg_old:BMGraphBuilder) -> GraphFixerResult:
-        bmg, errors = copy_and_replace(bmg_old, lambda c,s:Tensorizer(c,s))
+    def _tensorize(bmg_old: BMGraphBuilder) -> GraphFixerResult:
+        bmg, errors = copy_and_replace(bmg_old, lambda c, s: Tensorizer(c, s))
         return bmg, True, errors
 
-    def _detensorize(bmg_old:BMGraphBuilder) -> GraphFixerResult:
-        bmg, errors = copy_and_replace(bmg_old, lambda c,s:Devectorizer(c,s))
+    def _detensorize(bmg_old: BMGraphBuilder) -> GraphFixerResult:
+        bmg, errors = copy_and_replace(bmg_old, lambda c, s: Devectorizer(c, s))
         return bmg, True, errors
 
     return sequential_graph_fixer([_tensorize, _detensorize])

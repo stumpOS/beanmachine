@@ -52,8 +52,8 @@ from beanmachine.ppl.compiler.fix_unsupported import (
     unsupported_node_reporter,
     untypable_node_reporter,
 )
-from beanmachine.ppl.compiler.lattice_typer import LatticeTyper
 from beanmachine.ppl.compiler.fix_vectorized_graphs import vectorized_graph_fixer
+from beanmachine.ppl.compiler.lattice_typer import LatticeTyper
 
 
 default_skip_optimizations: Set[str] = {

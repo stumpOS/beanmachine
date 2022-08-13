@@ -2,39 +2,28 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-import math
 import typing
 from typing import Callable, Dict, List, Type
-from enum import Enum
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
-import beanmachine.ppl.compiler.bmg_types
-import beanmachine.ppl.compiler.broadcast
-from beanmachine.ppl.compiler.bmg_types import BMGMatrixType, Untypable
-import beanmachine.ppl.compiler.execution_context
-import beanmachine.ppl.compiler.lattice_typer
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
-from beanmachine.ppl.compiler.error_report import ErrorReport, UnsupportedNode, BadMatrixMultiplication
-from beanmachine.ppl.compiler.fix_matrix_scale import matrix_scale_fixer
-from beanmachine.ppl.compiler.fix_problem import (
-    ancestors_first_graph_fixer,
-    fixpoint_graph_fixer,
-    GraphFixer,
-    GraphFixerResult,
-    Inapplicable,
-    node_fixer_first_match,
-    NodeFixer,
-    NodeFixerResult,
-    sequential_graph_fixer,
+from beanmachine.ppl.compiler.error_report import (
+    BadMatrixMultiplication,
+    ErrorReport,
+    UnsupportedNode,
 )
-from beanmachine.ppl.compiler.sizer import is_scalar, Sizer, Unsized
+from beanmachine.ppl.compiler.sizer import Sizer
+
 
 class TransformAssessment:
-    def __init__(self, needs_transform:bool, errors:ErrorReport):
+    def __init__(self, needs_transform: bool, errors: ErrorReport):
         self.node_needs_transform = needs_transform
         self.error_report = errors
 
-def flatten(inputs:List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]) -> List[bn.BMGNode]:
+
+def flatten(
+    inputs: List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]
+) -> List[bn.BMGNode]:
     parents = []
     for input in inputs:
         if input == None:
@@ -46,15 +35,16 @@ def flatten(inputs:List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]) -> Li
             parents.append(input)
     return parents
 
+
 class Cloner:
-    def __init__(self, original:BMGraphBuilder):
+    def __init__(self, original: BMGraphBuilder):
         self.bmg_original = original
         self.bmg = BMGraphBuilder()
         self.sizer = Sizer()
         self.node_factories = _node_factories(self.bmg)
         self.value_factories = _constant_factories(self.bmg)
 
-    def clone(self, original:bn.BMGNode, parents:List[bn.BMGNode]) -> bn.BMGNode:
+    def clone(self, original: bn.BMGNode, parents: List[bn.BMGNode]) -> bn.BMGNode:
         if self.value_factories.__contains__(type(original)):
             image = self.value_factories[type(original)](original.value)
         elif isinstance(original, bn.Query):
@@ -79,6 +69,7 @@ class Cloner:
             self.bmg.execution_context.record_node_call(image, site)
         return image
 
+
 def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     return {
         bn.BernoulliLogitNode: bmg.add_bernoulli_logit,
@@ -97,7 +88,6 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.PoissonNode: bmg.add_poisson,
         bn.StudentTNode: bmg.add_studentt,
         bn.UniformNode: bmg.add_uniform,
-
         bn.AdditionNode: bmg.add_addition,
         bn.BitAndNode: bmg.add_bitand,
         bn.BitOrNode: bmg.add_bitor,
@@ -157,6 +147,7 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.ToRealNode: bmg.add_to_real,
     }
 
+
 def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
     return {
         bn.NegativeRealNode: bmg.add_neg_real,
@@ -170,15 +161,24 @@ def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.UntypedConstantNode: bmg.add_constant,
     }
 
+
 class NodeTransformer:
-    def assess_node(self, node:bn.BMGNode, original: BMGraphBuilder) -> TransformAssessment:
+    def assess_node(
+        self, node: bn.BMGNode, original: BMGraphBuilder
+    ) -> TransformAssessment:
         raise NotImplementedError("this is an abstract base class")
 
     # a node is either replaced 1-1, 1-many, or deleted
-    def transform_node(self, node:bn.BMGNode, new_inputs:List[bn.BMGNode]) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
+    def transform_node(
+        self, node: bn.BMGNode, new_inputs: List[bn.BMGNode]
+    ) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
         raise NotImplementedError("this is an abstract base class")
 
-def copy_and_replace(bmg_original:BMGraphBuilder, transformer_creator:Callable[[Cloner, Sizer], NodeTransformer]) -> typing.Tuple[BMGraphBuilder, ErrorReport]:
+
+def copy_and_replace(
+    bmg_original: BMGraphBuilder,
+    transformer_creator: Callable[[Cloner, Sizer], NodeTransformer],
+) -> typing.Tuple[BMGraphBuilder, ErrorReport]:
     cloner = Cloner(bmg_original)
     transformer = transformer_creator(cloner, cloner.sizer)
     copies = {}
@@ -197,7 +197,3 @@ def copy_and_replace(bmg_original:BMGraphBuilder, transformer_creator:Callable[[
             image = cloner.clone(original, parents)
         copies[original] = image
     return cloner.bmg, ErrorReport()
-
-
-
-

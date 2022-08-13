@@ -190,6 +190,7 @@ class UntypableNode(BMGError):
 
         return msg
 
+
 class UnsizableNode(BMGError):
     node: BMGNode
     node_locations: Set[FunctionCall]
@@ -203,8 +204,10 @@ class UnsizableNode(BMGError):
         self.node_locations = node_locations
 
     def __str__(self) -> str:
-        msg = f"The node {get_node_error_label(self.node)} cannot be sized." \
-              f" Check the shapes of its operands to ensure they are compatible."
+        msg = (
+            f"The node {get_node_error_label(self.node)} cannot be sized."
+            f" Check the shapes of its operands to ensure they are compatible."
+        )
 
         if len(self.node_locations) > 0:
             msg += "\nThe unsizable node was created in function call "
@@ -212,6 +215,7 @@ class UnsizableNode(BMGError):
             msg += "."
 
         return msg
+
 
 class ErrorReport:
 
