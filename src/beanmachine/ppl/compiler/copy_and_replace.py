@@ -39,6 +39,7 @@ class Cloner:
     def __init__(self, original: BMGraphBuilder):
         self.bmg_original = original
         self.bmg = BMGraphBuilder(ExecutionContext())
+        self.bmg._fix_observe_true = self.bmg_original._fix_observe_true
         self.sizer = Sizer()
         self.node_factories = _node_factories(self.bmg)
         self.value_factories = _constant_factories(self.bmg)
