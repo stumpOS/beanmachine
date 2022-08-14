@@ -6,11 +6,10 @@ import typing
 from typing import Callable, Dict, List, Type
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
+from beanmachine.ppl.compiler.execution_context import ExecutionContext, FunctionCall
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.error_report import (
-    BadMatrixMultiplication,
     ErrorReport,
-    UnsupportedNode,
 )
 from beanmachine.ppl.compiler.sizer import Sizer
 
@@ -39,10 +38,11 @@ def flatten(
 class Cloner:
     def __init__(self, original: BMGraphBuilder):
         self.bmg_original = original
-        self.bmg = BMGraphBuilder()
+        self.bmg = BMGraphBuilder(ExecutionContext())
         self.sizer = Sizer()
         self.node_factories = _node_factories(self.bmg)
         self.value_factories = _constant_factories(self.bmg)
+        self.copy_context = {}
 
     def clone(self, original: bn.BMGNode, parents: List[bn.BMGNode]) -> bn.BMGNode:
         if self.value_factories.__contains__(type(original)):
@@ -66,7 +66,16 @@ class Cloner:
 
         locations = self.bmg_original.execution_context.node_locations(original)
         for site in locations:
-            self.bmg.execution_context.record_node_call(image, site)
+            new_args = []
+            for arg in site.args:
+                if self.copy_context.__contains__(arg):
+                    new_args.append(self.copy_context[arg])
+                else:
+                    # TODO: error out instead? it's possible that multiple nodes replace a single node
+                    new_args.append(arg)
+            new_site = FunctionCall(site.func, new_args, {})
+            self.bmg.execution_context.record_node_call(image, new_site)
+        self.copy_context[original] = image
         return image
 
 
@@ -181,11 +190,10 @@ def copy_and_replace(
 ) -> typing.Tuple[BMGraphBuilder, ErrorReport]:
     cloner = Cloner(bmg_original)
     transformer = transformer_creator(cloner, cloner.sizer)
-    copies = {}
     for original in bmg_original.all_nodes():
         inputs = []
         for c in original.inputs.inputs:
-            inputs.append(copies[c])
+            inputs.append(cloner.copy_context[c])
         assessment = transformer.assess_node(original, cloner.bmg_original)
 
         if len(assessment.error_report.errors) > 0:
@@ -195,5 +203,6 @@ def copy_and_replace(
         else:
             parents = flatten(inputs)
             image = cloner.clone(original, parents)
-        copies[original] = image
+        if not cloner.copy_context.__contains__(original):
+            cloner.copy_context[original] = image
     return cloner.bmg, ErrorReport()
