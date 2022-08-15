@@ -8,7 +8,7 @@ import beanmachine.ppl.compiler.copy_and_replace
 import beanmachine.ppl.compiler.execution_context
 import beanmachine.ppl.compiler.lattice_typer
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
-from beanmachine.ppl.compiler.bmg_types import BMGMatrixType, Untypable
+from beanmachine.ppl.compiler.bmg_types import BMGMatrixType, unknown_number
 from beanmachine.ppl.compiler.copy_and_replace import (
     Cloner,
     NodeTransformer,
@@ -99,10 +99,10 @@ class Tensorizer(NodeTransformer):
                     # are undecipherable
                     lt = typer[lhs]
                     if not isinstance(lt, BMGMatrixType):
-                        lt = BMGMatrixType(Untypable, "", "", lhs_size[0], lhs_size[1])
+                        lt = BMGMatrixType(unknown_number, "", "", lhs_size[0], lhs_size[1])
                     rt = typer[rhs]
                     if not isinstance(rt, BMGMatrixType):
-                        rt = BMGMatrixType(Untypable, "", "", rhs_size[0], rhs_size[1])
+                        rt = BMGMatrixType(unknown_number, "", "", rhs_size[0], rhs_size[1])
                     error = BadMatrixMultiplication(
                         node, lt, rt, original.execution_context.node_locations(node)
                     )

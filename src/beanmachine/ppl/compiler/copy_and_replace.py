@@ -12,12 +12,6 @@ from beanmachine.ppl.compiler.error_report import ErrorReport
 from beanmachine.ppl.compiler.execution_context import ExecutionContext, FunctionCall
 from beanmachine.ppl.compiler.sizer import Sizer
 
-
-# class TransformAssessment:
-#     def __init__(self, needs_transform: bool, errors: ErrorReport):
-#         self.node_needs_transform = needs_transform
-#         self.error_report = errors
-
 TransformAssessment = collections.namedtuple(
     "TransformAssessment", ["node_needs_transform", "error_report"]
 )
@@ -62,7 +56,11 @@ class Cloner:
             self.bmg.query_map[key] = image
         elif isinstance(original, bn.Observation):
             assert len(parents) == 1
-            image = self.bmg.add_observation(parents[0], original.value)
+            sample = parents[0]
+            if isinstance(sample, bn.SampleNode):
+                image = self.bmg.add_observation(sample, original.value)
+            else:
+                raise ValueError("observations must have a sample operand")
         elif isinstance(original, bn.TensorNode):
             image = self.bmg.add_tensor(self.sizer[original], *parents)
         else:

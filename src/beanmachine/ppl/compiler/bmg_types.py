@@ -102,6 +102,7 @@ probability_element = BMGElementType("P", "probability")
 positive_real_element = BMGElementType("R+", "positive real")
 negative_real_element = BMGElementType("R-", "negative real")
 real_element = BMGElementType("R", "real")
+unknown_number = BMGElementType("U", "unknown number")
 
 
 class BMGMatrixType(BMGLatticeType):
