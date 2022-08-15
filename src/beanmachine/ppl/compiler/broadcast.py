@@ -8,13 +8,53 @@ from typing import Callable, List
 
 from torch import Size
 
-identity_fnc = lambda a: a
+
+def identity_fnc(a: List[int]) -> List[int]:
+    return a
 
 
-def broadcast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Callable]:
-    if input_size == target_size:
-        return identity_fnc
+def _create_input_list_from_target_list(
+    product_list: List[int], input_project_size: List[int]
+) -> Callable[[List[int]], int]:
+    # given a coordinate index of target, compute a global index of input
+    def input_list_from_target_list(target_list: List[int]) -> int:
+        i = 0
+        j = len(product_list) - 1
+        index = 0
+        for inx in target_list:
+            if input_project_size[i] == 1:
+                i = i + 1
+                j = j - 1
+                continue
+            else:
+                next = inx * product_list[j]
+                index = index + next
+            j = j - 1
+            i = i + 1
+        return index
 
+    return input_list_from_target_list
+
+
+def _create_target_index_to_composite(
+    target_size: Size, group_size: List[int]
+) -> Callable[[int], List]:
+    # given a global index, produce a coordinate
+    def target_index_to_composite(ti: int) -> List:
+        index_list = []
+        current_index = ti
+        j = len(target_size) - 1
+        for _ in target_size:
+            next_index = math.floor(current_index / group_size[j])
+            index_list.append(next_index)
+            current_index = current_index % group_size[j]
+            j = j - 1
+        return index_list
+
+    return target_index_to_composite
+
+
+def _normalize_size(input_size: Size, target_size: Size) -> List[int]:
     # Make the input size length equal to target size by buffering with 1's
     input_project_size = []
     ones_to_add = len(target_size) - len(input_size)
@@ -22,7 +62,14 @@ def broadcast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Cal
         input_project_size.append(1)
     for dim in input_size:
         input_project_size.append(dim)
+    return input_project_size
 
+
+def broadcast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Callable]:
+    if input_size == target_size:
+        return identity_fnc
+
+    input_project_size = _normalize_size(input_size, target_size)
     assert len(input_project_size) == len(target_size)
 
     # the input can be broadcast to the target if
@@ -45,18 +92,9 @@ def broadcast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Cal
         group_size.append(current)
         current = current * d
 
-    # given a global index, produce a coordinate
-    def target_index_to_composite(ti: int) -> List:
-        index_list = []
-        current_index = ti
-        j = len(target_size) - 1
-        for _ in target_size:
-            next_index = math.floor(current_index / group_size[j])
-            index_list.append(next_index)
-            current_index = current_index % group_size[j]
-            j = j - 1
-        return index_list
-
+    target_index_to_composite = _create_target_index_to_composite(
+        target_size, group_size
+    )
     # product list should be [2, 1, 1]
     product_list = []
     current = 1
@@ -67,23 +105,9 @@ def broadcast_fnc(input_size: Size, target_size: Size) -> typing.Union[bool, Cal
         product_list.append(current)
         current = current * d
 
-    # given a coordinate index of target, compute a global index of input
-    def input_list_from_target_list(target_list: List[int]) -> int:
-        i = 0
-        j = len(product_list) - 1
-        index = 0
-        for inx in target_list:
-            if input_project_size[i] == 1:
-                i = i + 1
-                j = j - 1
-                continue
-            else:
-                next = inx * product_list[j]
-                index = index + next
-            j = j - 1
-            i = i + 1
-        return index
-
+    input_list_from_target_list = _create_input_list_from_target_list(
+        product_list, input_project_size
+    )
     return lambda target_index: input_list_from_target_list(
         target_index_to_composite(target_index)
     )

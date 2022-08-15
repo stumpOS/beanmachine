@@ -7,6 +7,7 @@ from typing import Callable, List, Set, Tuple
 
 import beanmachine.ppl.compiler.profiler as prof
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
+from beanmachine.ppl.compiler.devectorizer_transformer import vectorized_graph_fixer
 from beanmachine.ppl.compiler.error_report import ErrorReport
 from beanmachine.ppl.compiler.fix_additions import addition_fixer, sum_fixer
 from beanmachine.ppl.compiler.fix_arithmetic import (
@@ -52,7 +53,6 @@ from beanmachine.ppl.compiler.fix_unsupported import (
     unsupported_node_reporter,
     untypable_node_reporter,
 )
-from beanmachine.ppl.compiler.devectorizer_transformer import vectorized_graph_fixer
 from beanmachine.ppl.compiler.lattice_typer import LatticeTyper
 
 

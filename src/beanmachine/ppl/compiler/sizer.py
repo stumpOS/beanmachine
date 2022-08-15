@@ -154,6 +154,7 @@ _broadcast_the_inputs: Set[type] = {
     bn.TransposeNode,
 }
 
+
 def _broadcast_two(x: Size, y: Size) -> Size:
     # Given two sizes, what is their broadcast size, if any?  Rather than replicate
     # the logic in torch which does this computation, we simply construct two
@@ -218,7 +219,7 @@ class Sizer(TyperBase[Size]):
             bn.ToMatrixNode: self._size_to_matrix,
             bn.LogSumExpNode: self._size_log_sum_exp_node,
             bn.LogSumExpVectorNode: self._size_log_sum_exp_vector_node,
-            bn.LogSumExpTorchNode: self._size_log_sum_exp_torch_node
+            bn.LogSumExpTorchNode: self._size_log_sum_exp_torch_node,
         }
         # TODO:
         # ColumnIndexNode
@@ -298,12 +299,12 @@ class Sizer(TyperBase[Size]):
             return Size([rows])
         return Size([columns, rows])
 
-    def _size_column(self, node:bn.ColumnIndexNode) -> Size:
+    def _size_column(self, node: bn.ColumnIndexNode) -> Size:
         size_tensor = self[node.inputs.inputs[0]]
         # column size is always the last value of the shape since its the inner most group
         return Size([size_tensor[len(size_tensor) - 1]])
 
-    def _size_log_sum_exp_vector_node(self, node:bn.LogSumExpVectorNode) -> Size:
+    def _size_log_sum_exp_vector_node(self, node: bn.LogSumExpVectorNode) -> Size:
         # this expects a single-column matrix (and sums together all entries in the column?)
         operand_size = self[node.operand]
         dim = len(operand_size)
@@ -328,17 +329,14 @@ class Sizer(TyperBase[Size]):
 
         return operand_size
 
-    def _size_log_sum_exp_torch_node(self, node:bn.LogSumExpTorchNode) -> Size:
+    def _size_log_sum_exp_torch_node(self, node: bn.LogSumExpTorchNode) -> Size:
         # it has three operands: the tensor being summed, the dimension along which it is summed, and a flag giving the shape
         if len(node.inputs.inputs) != 3:
             return Unsized
         tensor_being_summed = node.inputs.inputs[0]
-        target_dimension = node.inputs.inputs[1]
-        keep_dim = node.inputs.inputs[2]
         # TODO: we can't compute the size at compile time but we don't have a way to represent dynamic sizes in Size right now
         # For now, just return original size
         return self[tensor_being_summed]
-
 
     # This implements the abstract base type method.
     def _compute_type_inputs_known(self, node: bn.BMGNode) -> Size:

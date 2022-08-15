@@ -25,10 +25,10 @@ class Tensorizer(NodeTransformer):
 
     def _is_matrix(self, node: bn.BMGNode) -> bool:
         size = self.sizer[node]
-        l = len(size)
-        if l == 1:
+        length = len(size)
+        if length == 1:
             return size[0] > 1
-        elif l == 2:
+        elif length == 2:
             return True
         else:
             # either length is 0 or length is greater than 2 so it's a scalar or higher dimensional tensor
@@ -44,18 +44,18 @@ class Tensorizer(NodeTransformer):
                 return None
             for parent in original_node.inputs.inputs:
                 if self._is_matrix(parent):
-                    if tensor_parent == None:
+                    if tensor_parent is None:
                         tensor_parent = parent
-                elif scalar_parent == None:
+                elif scalar_parent is None:
                     scalar_parent = parent
-            if not scalar_parent == None and not tensor_parent == None:
+            if scalar_parent is not None and tensor_parent is not None:
                 return scalar_parent, tensor_parent
             return None
 
     # a node can be tensorized if all its parents satisfy the type requirements
     def can_be_tensorized(self, original_node: bn.BMGNode) -> bool:
         if isinstance(original_node, bn.MultiplicationNode):
-            return not self._scalar_and_tensor_parents(original_node) == None
+            return not self._scalar_and_tensor_parents(original_node) is None
         else:
             return False
 
@@ -65,7 +65,7 @@ class Tensorizer(NodeTransformer):
         report = ErrorReport()
         error = None
         # enable registering size sensitive verification checks for certain nodes
-        # otherwise the sizer will be unable to determine a size which is necessary for
+        # otherwise the sizer will be unable to determine a size which is necessary for tensorization
         if isinstance(node, bn.MatrixMultiplicationNode):
             lhs = node.inputs.inputs[0]
             rhs = node.inputs.inputs[1]
@@ -106,10 +106,10 @@ class Tensorizer(NodeTransformer):
                     error = BadMatrixMultiplication(
                         node, lt, rt, original.execution_context.node_locations(node)
                     )
-        if not error == None:
+        if error is not None:
             report.add_error(error)
         return TransformAssessment(
-            needs_transform=self.can_be_tensorized(node), errors=report
+            self.can_be_tensorized(node), report
         )
 
     # a node is either replaced 1-1, 1-many, or deleted

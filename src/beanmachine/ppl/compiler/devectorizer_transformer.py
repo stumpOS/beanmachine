@@ -2,10 +2,9 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-import math
 import typing
 from enum import Enum
-from typing import Callable, Dict, List, Type
+from typing import Callable, Dict, List
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
 import beanmachine.ppl.compiler.bmg_types
@@ -87,69 +86,93 @@ class CopyContext:
         self.clones: Dict[bn.BMGNode, bn.BMGNode] = {}
 
 
+def _parameter_to_type_mm(node: bn.MatrixMultiplicationNode, index: int) -> ElementType:
+    assert index == 0 or index == 1
+    return ElementType.TENSOR
+
+
+def _parameter_to_type_index(index: int) -> ElementType:
+    if index == 0:
+        return ElementType.TENSOR
+    else:
+        return ElementType.SCALAR
+
+
+def _parameter_to_type_sample(node: bn.SampleNode, i: int) -> ElementType:
+    if _tensor_valued_distributions.__contains__(type(node.operand)):
+        return ElementType.TENSOR
+    else:
+        return ElementType.SCALAR
+
+
+def _parameter_to_type_query(sizer: Sizer, node: bn.Query, index: int) -> ElementType:
+    assert index == 0
+    original_size = sizer[node]
+    if original_size == Unsized or not is_scalar(original_size):
+        return ElementType.TENSOR
+    else:
+        return ElementType.SCALAR
+
+
+def _parameter_to_type_obs(node: bn.Observation, index: int) -> ElementType:
+    # TODO: what is the expectation for Observations?
+    # from the dirichlet tests it appears they can be tensors
+    # for everything else, it looks like they must be scalars.
+    # until I find out more, I'm implementing the solution that
+    # enables all existing tests to pass
+    sample = node.inputs.inputs[0]
+    dist = sample.inputs.inputs[0]
+    if _tensor_valued_distributions.__contains__(type(dist)):
+        return ElementType.TENSOR
+    else:
+        return ElementType.SCALAR
+
+
+def _parameter_to_type_matrix_scale(
+    node: bn.MatrixScaleNode, index: int
+) -> ElementType:
+    if index == 0:
+        return ElementType.SCALAR
+    if index == 1:
+        return ElementType.TENSOR
+    else:
+        raise ValueError(
+            f"MatrixScale only has 2 inputs but index of {index} was provided"
+        )
+
+
 class Devectorizer(NodeTransformer):
     def __init__(self, cloner: Cloner, sizer: Sizer):
         self.copy_context = CopyContext()
         self.cloner = cloner
         self.sizer = sizer
+        # TODO: add index
+        self._parameter_to_type = {
+            bn.MatrixMultiplicationNode: _parameter_to_type_mm,
+            bn.ColumnIndexNode: lambda n, i: _parameter_to_type_index(i),
+            bn.VectorIndexNode: lambda n, i: _parameter_to_type_index(i),
+            bn.SampleNode: _parameter_to_type_sample,
+            bn.Query: lambda n, i: _parameter_to_type_query(self.sizer, n, i),
+            bn.Observation: _parameter_to_type_obs,
+            bn.MatrixScaleNode: _parameter_to_type_matrix_scale,
+            bn.IndexNode: lambda n, i: _parameter_to_type_index(i),
+        }
 
     def __requires_element_type_at(self, node: bn.BMGNode, index: int) -> ElementType:
-        if _tensor_valued_distributions.__contains__(type(node)):
+        node_type = type(node)
+        if _tensor_valued_distributions.__contains__(node_type):
             return ElementType.TENSOR
-        if isinstance(node, bn.MatrixMultiplicationNode):
-            assert index == 0 or index == 1
-            return ElementType.TENSOR
-        if isinstance(node, bn.IndexNode):
-            return ElementType.TENSOR
-        if isinstance(node, bn.ColumnIndexNode) or isinstance(node, bn.VectorIndexNode):
-            if index == 0:
-                return ElementType.TENSOR
-            else:
-                return ElementType.SCALAR
-        if _unary_tensor_ops.__contains__(type(node)):
+        if self._parameter_to_type.__contains__(node_type):
+            return self._parameter_to_type[node_type](node, index)
+        if _unary_tensor_ops.__contains__(node_type):
             assert index == 0
             return ElementType.TENSOR
-        if isinstance(node, bn.SampleNode):
-            if _tensor_valued_distributions.__contains__(type(node.operand)):
-                return ElementType.TENSOR
-            else:
-                return ElementType.SCALAR
-        if isinstance(node, bn.Query):
-            assert index == 0
-            original_size = self.sizer[node]
-            if original_size == Unsized or not is_scalar(original_size):
-                return ElementType.TENSOR
-            else:
-                return ElementType.SCALAR
-        if isinstance(node, bn.Observation):
-            # TODO: what is the expectation for Observations?
-            # from the dirichlet tests it appears they can be tensors
-            # for everything else, it looks like they must be scalars.
-            # until I find out more, I'm implementing the solution that
-            # enables all existing tests to pass
-            sample = node.inputs.inputs[0]
-            dist = sample.inputs.inputs[0]
-            if _tensor_valued_distributions.__contains__(type(dist)):
-                return ElementType.TENSOR
-            else:
-                return ElementType.SCALAR
-
-        if isinstance(node, bn.MatrixScaleNode):
-            if index == 0:
-                return ElementType.SCALAR
-            if index == 1:
-                return ElementType.TENSOR
-            else:
-                raise ValueError(
-                    f"MatrixScale only has 2 inputs but index of {index} was provided"
-                )
-        # if isinstance(node, bn.Observation):
-        #     # TODO: is this accurate?
-        #     return ElementType.SCALAR
         else:
             return ElementType.SCALAR
 
-    def __devectorize_transformation_type(self, node: bn.BMGNode) -> DevectorizeTransformation:
+    def __devectorize_transformation_type(
+        self, node: bn.BMGNode
+    ) -> DevectorizeTransformation:
         size = self.sizer[node]
         is_eligible_for_devectorize = _size_is_devectorizable(size) and not isinstance(
             node, bn.Query
@@ -386,8 +409,8 @@ class Devectorizer(NodeTransformer):
             report.add_error(
                 UnsizableNode(node, original.execution_context.node_locations(node))
             )
-            return TransformAssessment(needs_transform=False, errors=report)
-        return TransformAssessment(needs_transform=True, errors=ErrorReport())
+            return TransformAssessment(False, report)
+        return TransformAssessment(True, ErrorReport())
 
     # a node is either replaced 1-1, 1-many, or deleted
     def transform_node(

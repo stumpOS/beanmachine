@@ -2,30 +2,30 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+import collections
 import typing
 from typing import Callable, Dict, List, Type
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
-from beanmachine.ppl.compiler.execution_context import ExecutionContext, FunctionCall
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
-from beanmachine.ppl.compiler.error_report import (
-    ErrorReport,
-)
+from beanmachine.ppl.compiler.error_report import ErrorReport
+from beanmachine.ppl.compiler.execution_context import ExecutionContext, FunctionCall
 from beanmachine.ppl.compiler.sizer import Sizer
 
 
-class TransformAssessment:
-    def __init__(self, needs_transform: bool, errors: ErrorReport):
-        self.node_needs_transform = needs_transform
-        self.error_report = errors
+# class TransformAssessment:
+#     def __init__(self, needs_transform: bool, errors: ErrorReport):
+#         self.node_needs_transform = needs_transform
+#         self.error_report = errors
 
+TransformAssessment = collections.namedtuple('TransformAssessment', ['node_needs_transform', 'error_report'])
 
 def flatten(
     inputs: List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]
 ) -> List[bn.BMGNode]:
     parents = []
     for input in inputs:
-        if input == None:
+        if input is None:
             continue
         if isinstance(input, List):
             for i in input:
