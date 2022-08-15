@@ -108,9 +108,7 @@ class Tensorizer(NodeTransformer):
                     )
         if error is not None:
             report.add_error(error)
-        return TransformAssessment(
-            self.can_be_tensorized(node), report
-        )
+        return TransformAssessment(self.can_be_tensorized(node), report)
 
     # a node is either replaced 1-1, 1-many, or deleted
     def transform_node(

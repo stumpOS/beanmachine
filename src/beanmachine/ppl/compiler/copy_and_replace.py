@@ -18,7 +18,10 @@ from beanmachine.ppl.compiler.sizer import Sizer
 #         self.node_needs_transform = needs_transform
 #         self.error_report = errors
 
-TransformAssessment = collections.namedtuple('TransformAssessment', ['node_needs_transform', 'error_report'])
+TransformAssessment = collections.namedtuple(
+    "TransformAssessment", ["node_needs_transform", "error_report"]
+)
+
 
 def flatten(
     inputs: List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]
