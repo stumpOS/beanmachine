@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 import typing
 from enum import Enum
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
 import beanmachine.ppl.compiler.bmg_types
@@ -276,12 +276,12 @@ class Devectorizer(NodeTransformer):
         return parents
 
     def __flatten_parents(
-        self, nd: bn.BMGNode, parents: [], creator: Callable
+        self, nd: bn.BMGNode, parents: List, creator: Callable
     ) -> List[bn.BMGNode]:
         return self.__flatten_parents_with_index(nd, parents, lambda i, s: creator(*s))
 
     def __flatten_parents_with_index(
-        self, node: bn.BMGNode, parents: [], creator: Callable
+        self, node: bn.BMGNode, parents: List, creator: Callable
     ) -> List[bn.BMGNode]:
         size = self.sizer[node]
         item_count = 1
@@ -382,13 +382,18 @@ class Devectorizer(NodeTransformer):
                 for i in range(0, node.value.size()[0]):
                     for j in range(0, node.value.size()[1]):
                         values.append(node.value[i][j])
+
             return self.__flatten_parents_with_index(
                 node,
                 parents,
-                lambda i, s: self.cloner.bmg.add_observation(*s, values[i]),
+                lambda i, s: self.__add_observation(s, values[i]),
             )
         else:
             raise NotImplementedError()
+
+    def __add_observation(self, inputs: List[bn.BMGNode], value: Any) -> bn.Observation:
+        assert len(inputs) == 1
+        return self.cloner.bmg.add_observation(inputs[0], value)
 
     def _devectorize(self, node: bn.BMGNode) -> List[bn.BMGNode]:
         # there are two ways to devectorize a node: (1) we can scatter it or (2) we can split it (clone and index)

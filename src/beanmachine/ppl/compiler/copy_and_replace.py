@@ -44,7 +44,12 @@ class Cloner:
 
     def clone(self, original: bn.BMGNode, parents: List[bn.BMGNode]) -> bn.BMGNode:
         if self.value_factories.__contains__(type(original)):
-            image = self.value_factories[type(original)](original.value)
+            if hasattr(original, "value"):
+                image = self.value_factories[type(original)](original.value)
+            else:
+                raise ValueError(
+                    f"Internal compiler error. The type f{type(original)} should not be in the value factory because it does not have a value attribute"
+                )
         elif isinstance(original, bn.Query):
             assert len(parents) == 1
             image = self.bmg.add_query(parents[0])
