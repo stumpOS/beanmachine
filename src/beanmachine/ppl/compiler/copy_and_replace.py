@@ -2,9 +2,10 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+
 import collections
 import typing
-from typing import Callable, Dict, List, Type
+from typing import Callable, Dict, List, Optional, Type
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
@@ -18,7 +19,7 @@ TransformAssessment = collections.namedtuple(
 
 
 def flatten(
-    inputs: List[typing.Union[bn.BMGNode, List[bn.BMGNode], None]]
+    inputs: List[Optional[typing.Union[bn.BMGNode, List[bn.BMGNode]]]]
 ) -> List[bn.BMGNode]:
     parents = []
     for input in inputs:
@@ -187,7 +188,7 @@ class NodeTransformer:
     # a node is either replaced 1-1, 1-many, or deleted
     def transform_node(
         self, node: bn.BMGNode, new_inputs: List[bn.BMGNode]
-    ) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
+    ) -> typing.Optional[typing.Union[bn.BMGNode, List[bn.BMGNode]]]:
         raise NotImplementedError("this is an abstract base class")
 
 

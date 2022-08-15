@@ -1,3 +1,8 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
 import typing
 from typing import List
 
@@ -99,10 +104,14 @@ class Tensorizer(NodeTransformer):
                     # are undecipherable
                     lt = typer[lhs]
                     if not isinstance(lt, BMGMatrixType):
-                        lt = BMGMatrixType(unknown_number, "", "", lhs_size[0], lhs_size[1])
+                        lt = BMGMatrixType(
+                            unknown_number, "", "", lhs_size[0], lhs_size[1]
+                        )
                     rt = typer[rhs]
                     if not isinstance(rt, BMGMatrixType):
-                        rt = BMGMatrixType(unknown_number, "", "", rhs_size[0], rhs_size[1])
+                        rt = BMGMatrixType(
+                            unknown_number, "", "", rhs_size[0], rhs_size[1]
+                        )
                     error = BadMatrixMultiplication(
                         node, lt, rt, original.execution_context.node_locations(node)
                     )
@@ -113,7 +122,7 @@ class Tensorizer(NodeTransformer):
     # a node is either replaced 1-1, 1-many, or deleted
     def transform_node(
         self, node: bn.BMGNode, new_inputs: List[bn.BMGNode]
-    ) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
+    ) -> typing.Optional[typing.Union[bn.BMGNode, List[bn.BMGNode]]]:
         if isinstance(node, bn.MultiplicationNode):
             if len(new_inputs) != 2:
                 raise ValueError(

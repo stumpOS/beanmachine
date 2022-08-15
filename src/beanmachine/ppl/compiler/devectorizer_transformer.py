@@ -2,6 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+
 import typing
 from enum import Enum
 from typing import Any, Callable, Dict, List
@@ -420,7 +421,7 @@ class Devectorizer(NodeTransformer):
     # a node is either replaced 1-1, 1-many, or deleted
     def transform_node(
         self, node: bn.BMGNode, new_inputs: List[bn.BMGNode]
-    ) -> typing.Union[bn.BMGNode, List[bn.BMGNode], None]:
+    ) -> typing.Optional[typing.Union[bn.BMGNode, List[bn.BMGNode]]]:
         transform_type = self.__devectorize_transformation_type(node)
         if transform_type == DevectorizeTransformation.YES:
             image = self._devectorize(node)
