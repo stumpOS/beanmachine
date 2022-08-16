@@ -314,7 +314,11 @@ class RequirementsFixer:
             else:
                 result = self.bmg.add_to_real_matrix(node)
         elif requirement == bt.RealMatrix:
-            if isinstance(node_type, bt.BMGMatrixType) and node_type.rows == 1 and node_type.columns == 1:
+            if (
+                isinstance(node_type, bt.BMGMatrixType)
+                and node_type.rows == 1
+                and node_type.columns == 1
+            ):
                 result = self.bmg.add_to_real(node)
             else:
                 result = self.bmg.add_to_real_matrix(node)

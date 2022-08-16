@@ -187,7 +187,9 @@ class LatticeTyper(TyperBase[bt.BMGLatticeType]):
             bn.TransposeNode: self._type_transpose,
         }
 
-    def _lattice_type_for_element_type(self, element_type:bt.BMGElementType) -> bt.BMGLatticeType:
+    def _lattice_type_for_element_type(
+        self, element_type: bt.BMGElementType
+    ) -> bt.BMGLatticeType:
         if element_type == bt.positive_real_element:
             return bt.PositiveReal
         if element_type == bt.negative_real_element:
@@ -203,15 +205,19 @@ class LatticeTyper(TyperBase[bt.BMGLatticeType]):
         else:
             raise ValueError("unrecognized element type")
 
-    def _type_binary_elementwise_op(self, node: bn.BinaryOperatorNode) -> bt.BMGLatticeType:
+    def _type_binary_elementwise_op(
+        self, node: bn.BinaryOperatorNode
+    ) -> bt.BMGLatticeType:
         left_type = self[node.left]
         right_type = self[node.right]
         assert isinstance(left_type, bt.BMGMatrixType)
         assert isinstance(right_type, bt.BMGMatrixType)
         assert right_type.rows == left_type.rows
         assert right_type.columns == left_type.columns
-        op_type = bt.supremum(self._lattice_type_for_element_type(left_type.element_type),
-                              self._lattice_type_for_element_type(right_type.element_type))
+        op_type = bt.supremum(
+            self._lattice_type_for_element_type(left_type.element_type),
+            self._lattice_type_for_element_type(right_type.element_type),
+        )
         if bt.supremum(op_type, bt.NegativeReal) == bt.NegativeReal:
             return bt.NegativeRealMatrix(left_type.rows, left_type.columns)
         if bt.supremum(op_type, bt.PositiveReal) == bt.PositiveReal:
@@ -228,7 +234,9 @@ class LatticeTyper(TyperBase[bt.BMGLatticeType]):
     def _type_matrix_sum(self, node: bn.MatrixSumNode) -> bt.BMGLatticeType:
         operand_type = self[node.operand]
         assert isinstance(operand_type, bt.BMGMatrixType)
-        operand_element_type = self._lattice_type_for_element_type(operand_type.element_type)
+        operand_element_type = self._lattice_type_for_element_type(
+            operand_type.element_type
+        )
         return operand_element_type
 
     def _type_observation(self, node: bn.Observation) -> bt.BMGLatticeType:

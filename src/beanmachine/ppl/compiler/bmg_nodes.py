@@ -1064,7 +1064,6 @@ class MatrixScaleNode(BinaryOperatorNode):
         return "(" + str(self.left) + "*" + str(self.right) + ")"
 
 
-
 class PowerNode(BinaryOperatorNode):
     """This represents an x-to-the-y operation."""
 

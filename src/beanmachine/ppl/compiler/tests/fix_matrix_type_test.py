@@ -9,7 +9,8 @@ import torch
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.gen_bmg_graph import to_bmg_graph
 from beanmachine.ppl.compiler.gen_dot import to_dot
-from torch import Tensor, Size
+from torch import Size, Tensor
+
 
 class FixMatrixAdditionTest(unittest.TestCase):
     def test_fix_matrix_addition(self) -> None:
