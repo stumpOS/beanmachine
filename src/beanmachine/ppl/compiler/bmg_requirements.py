@@ -44,6 +44,7 @@ _known_requirements: Dict[type, List[bt.Requirement]] = {
     bn.BinomialNode: [bt.Natural, bt.Probability],
     # TODO: We don't enforce squareness or positive-definite-ness for Cholesky
     bn.CholeskyNode: [bt.any_real_matrix],
+    bn.ElementwiseMultiplyNode: [bt.RealMatrix, bt.RealMatrix],
     bn.GammaNode: [bt.PositiveReal, bt.PositiveReal],
     bn.HalfCauchyNode: [bt.PositiveReal],
     bn.NormalNode: [bt.Real, bt.PositiveReal],
@@ -53,6 +54,7 @@ _known_requirements: Dict[type, List[bt.Requirement]] = {
     bn.LogisticNode: [bt.Real],
     bn.Log1mexpNode: [bt.NegativeReal],
     bn.MatrixMultiplicationNode: [bt.any_real_matrix, bt.any_real_matrix],
+    bn.MatrixAddNode: [bt.RealMatrix, bt.RealMatrix],
     bn.PhiNode: [bt.Real],
     bn.ToIntNode: [bt.upper_bound(bt.Real)],
     bn.ToNegativeRealNode: [bt.Real],

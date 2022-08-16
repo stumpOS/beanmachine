@@ -189,6 +189,7 @@ class BMGInference:
 
         generated_graph = to_bmg_graph(bmg, skip_optimizations)
         g = generated_graph.graph
+        graph_str = g.to_dot()
         query_to_query_id = generated_graph.query_to_query_id
 
         samples = []

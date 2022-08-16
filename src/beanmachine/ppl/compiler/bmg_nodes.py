@@ -870,6 +870,12 @@ class DivisionNode(BinaryOperatorNode):
     def __str__(self) -> str:
         return "(" + str(self.left) + "/" + str(self.right) + ")"
 
+class ElementwiseMultiplyNode(BinaryOperatorNode):
+    def __init__(self, left: BMGNode, right: BMGNode):
+        BinaryOperatorNode.__init__(self, left, right)
+
+    def __str__(self) -> str:
+        return f"${self.left} * f{self.right}"
 
 class FloorDivNode(BinaryOperatorNode):
     def __init__(self, left: BMGNode, right: BMGNode):
@@ -1022,6 +1028,15 @@ class ColumnIndexNode(BinaryOperatorNode):
     def __str__(self) -> str:
         return "ColumnIndex"
 
+class MatrixAddNode(BinaryOperatorNode):
+    """This represents an exponentiation operation; it is generated when
+    a model contains calls to Tensor.exp or math.exp."""
+
+    def __init__(self, left: BMGNode, right: BMGNode):
+        BinaryOperatorNode.__init__(self, left, right)
+
+    def __str__(self) -> str:
+        return f"MatrixAdd(f{self.left}, f{self.right}"
 
 class MatrixMultiplicationNode(BinaryOperatorNode):
     """This represents a matrix multiplication."""
@@ -1091,6 +1106,23 @@ class ExpNode(UnaryOperatorNode):
 
     def __str__(self) -> str:
         return "Exp(" + str(self.operand) + ")"
+
+class MatrixExpNode(UnaryOperatorNode):
+    """This represents an exponentiation operation; it is generated when
+    a model contains calls to Tensor.exp or math.exp."""
+
+    def __init__(self, operand: BMGNode):
+        UnaryOperatorNode.__init__(self, operand)
+
+    def __str__(self) -> str:
+        return "MatrixExp(" + str(self.operand) + ")"
+
+class MatrixSumNode(UnaryOperatorNode):
+    def __init__(self, operand: BMGNode):
+        UnaryOperatorNode.__init__(self, operand)
+
+    def __str__(self) -> str:
+        return "MatrixSum(" + str(self.operand) + ")"
 
 
 class Exp2Node(UnaryOperatorNode):

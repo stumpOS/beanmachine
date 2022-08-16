@@ -35,11 +35,18 @@ _unary_tensor_ops = [
     bn.LogSumExpNode,
     bn.LogSumExpVectorNode,
     bn.LogSumExpTorchNode,
-    bn.SumNode,
+    bn.MatrixExpNode,
+    bn.MatrixSumNode,
+    #bn.SumNode,
     bn.TransposeNode,
     bn.ToPositiveRealMatrixNode,
     bn.ToRealMatrixNode,
     bn.CholeskyNode,
+]
+
+_binary_tensor_ops = [
+    bn.ElementwiseMultiplyNode,
+    bn.MatrixAddNode
 ]
 
 _tensor_constants = [
@@ -53,7 +60,10 @@ _tensor_valued_distributions = [bn.CategoricalNode, bn.DirichletNode]
 _indexable_node_types = [
     bn.ColumnIndexNode,
     bn.ConstantTensorNode,
+    bn.ElementwiseMultiplyNode,
     bn.IndexNode,
+    bn.MatrixAddNode,
+    bn.MatrixExpNode,
     bn.MatrixScaleNode,
     bn.MatrixMultiplicationNode,
     bn.SampleNode,
@@ -92,8 +102,16 @@ def _parameter_to_type_mm(node: bn.MatrixMultiplicationNode, index: int) -> Elem
     return ElementType.TENSOR
 
 
-def _parameter_to_type_index(index: int) -> ElementType:
+def _parameter_to_type_singel_index(index: int) -> ElementType:
     if index == 0:
+        return ElementType.TENSOR
+    else:
+        return ElementType.SCALAR
+
+def _parameter_to_type_multi_index(node:bn.IndexNode, index: int) -> ElementType:
+    if index == 0:
+        return ElementType.TENSOR
+    if len(node.inputs.inputs) > 2:
         return ElementType.TENSOR
     else:
         return ElementType.SCALAR
@@ -150,13 +168,13 @@ class Devectorizer(NodeTransformer):
         # TODO: add index
         self._parameter_to_type = {
             bn.MatrixMultiplicationNode: _parameter_to_type_mm,
-            bn.ColumnIndexNode: lambda n, i: _parameter_to_type_index(i),
-            bn.VectorIndexNode: lambda n, i: _parameter_to_type_index(i),
+            bn.ColumnIndexNode: lambda n, i: _parameter_to_type_singel_index(i),
+            bn.VectorIndexNode: lambda n, i: _parameter_to_type_singel_index(i),
             bn.SampleNode: _parameter_to_type_sample,
             bn.Query: lambda n, i: _parameter_to_type_query(self.sizer, n, i),
             bn.Observation: _parameter_to_type_obs,
             bn.MatrixScaleNode: _parameter_to_type_matrix_scale,
-            bn.IndexNode: lambda n, i: _parameter_to_type_index(i),
+            bn.IndexNode: _parameter_to_type_multi_index,
         }
 
     def __requires_element_type_at(self, node: bn.BMGNode, index: int) -> ElementType:
@@ -165,6 +183,9 @@ class Devectorizer(NodeTransformer):
             return ElementType.TENSOR
         if self._parameter_to_type.__contains__(node_type):
             return self._parameter_to_type[node_type](node, index)
+        if _binary_tensor_ops.__contains__(node_type):
+            assert index == 0 or index == 1
+            return ElementType.TENSOR
         if _unary_tensor_ops.__contains__(node_type):
             assert index == 0
             return ElementType.TENSOR
@@ -341,23 +362,23 @@ class Devectorizer(NodeTransformer):
         elif dim == 1:
             for i in range(0, size[0]):
                 ci = self.cloner.bmg.add_constant(i)
-                ni = self.cloner.bmg.add_index(n, ci)
+                ni = self.cloner.bmg.add_vector_index(n, ci)
                 index_list.append(ni)
         elif size[0] == 1:
             assert dim == 2
             for i in range(0, size[1]):
                 ci = self.cloner.bmg.add_constant(i)
-                ni = self.cloner.bmg.add_index(n, ci)
+                ni = self.cloner.bmg.add_vector_index(n, ci)
                 index_list.append(ni)
         else:
             # We need two levels of indexing.
             assert dim == 2
             for i in range(0, size[0]):
                 ci = self.cloner.bmg.add_constant(i)
-                ni = self.cloner.bmg.add_index(n, ci)
+                ni = self.cloner.bmg.add_column_index(n, ci)
                 for j in range(0, size[1]):
                     cj = self.cloner.bmg.add_constant(j)
-                    nij = self.cloner.bmg.add_index(ni, cj)
+                    nij = self.cloner.bmg.add_vector_index(ni, cj)
                     index_list.append(nij)
         return index_list
 
@@ -383,18 +404,19 @@ class Devectorizer(NodeTransformer):
                 for i in range(0, node.value.size()[0]):
                     for j in range(0, node.value.size()[1]):
                         values.append(node.value[i][j])
-
+            if len(values) < len(parents):
+                raise ValueError("error")
             return self.__flatten_parents_with_index(
                 node,
                 parents,
-                lambda i, s: self.__add_observation(s, values[i]),
+                lambda i, s: self.__add_observation(s, i, values),
             )
         else:
             raise NotImplementedError()
 
-    def __add_observation(self, inputs: List[bn.BMGNode], value: Any) -> bn.Observation:
+    def __add_observation(self, inputs: List[bn.BMGNode], i:int, value: Any) -> bn.Observation:
         assert len(inputs) == 1
-        return self.cloner.bmg.add_observation(inputs[0], value)
+        return self.cloner.bmg.add_observation(inputs[0], value[i])
 
     def _devectorize(self, node: bn.BMGNode) -> List[bn.BMGNode]:
         # there are two ways to devectorize a node: (1) we can scatter it or (2) we can split it (clone and index)
