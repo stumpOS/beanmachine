@@ -11,6 +11,8 @@ or cannot be made to meet type requirements, an error report is
 returned."""
 
 
+from typing import Optional, Tuple
+
 import beanmachine.ppl.compiler.bmg_nodes as bn
 import beanmachine.ppl.compiler.bmg_types as bt
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
@@ -292,6 +294,64 @@ class RequirementsFixer:
             or requirement == bt.upper_bound(bt.NegativeReal)
         ) and node_type == bt.Real
 
+    def _meet_real_matrix_requirement(
+        self,
+        node: bn.OperatorNode,
+        dim_req: Optional[Tuple[int, int]],
+        consumer: bn.BMGNode,
+        edge: str,
+    ) -> bn.BMGNode:
+        node_type = self._typer[node]
+        if dim_req is not None:
+            if dim_req[0] == 1 and dim_req[1] == 1:
+                if (
+                    isinstance(node_type, bt.BMGMatrixType)
+                    and node_type.rows == 1
+                    and node_type.columns == 1
+                ):
+                    result = self.bmg.add_to_real(node)
+                else:
+                    self.errors.add_error(
+                        Violation(
+                            node,
+                            node_type,
+                            bt.RealMatrix(1, 1),
+                            consumer,
+                            edge,
+                            self.bmg.execution_context.node_locations(consumer),
+                        )
+                    )
+                return node
+            else:
+                if (
+                    isinstance(node_type, bt.BMGMatrixType)
+                    and node_type.rows == dim_req[0]
+                    and node_type.columns == dim_req[1]
+                ):
+                    result = self.bmg.add_to_real_matrix(node)
+                else:
+                    self.errors.add_error(
+                        Violation(
+                            node,
+                            node_type,
+                            bt.RealMatrix(1, 1),
+                            consumer,
+                            edge,
+                            self.bmg.execution_context.node_locations(consumer),
+                        )
+                    )
+                return node
+        else:
+            if (
+                isinstance(node_type, bt.BMGMatrixType)
+                and node_type.rows == 1
+                and node_type.columns == 1
+            ):
+                result = self.bmg.add_to_real(node)
+            else:
+                result = self.bmg.add_to_real_matrix(node)
+        return result
+
     def _meet_operator_requirement(
         self,
         node: bn.OperatorNode,
@@ -309,19 +369,11 @@ class RequirementsFixer:
 
         node_type = self._typer[node]
         if isinstance(requirement, bt.RealMatrix):
-            if requirement.rows == 1 and requirement.columns == 1:
-                result = self.bmg.add_to_real(node)
-            else:
-                result = self.bmg.add_to_real_matrix(node)
+            return self._meet_real_matrix_requirement(
+                node, (requirement.rows, requirement.columns), consumer, edge
+            )
         elif requirement == bt.RealMatrix:
-            if (
-                isinstance(node_type, bt.BMGMatrixType)
-                and node_type.rows == 1
-                and node_type.columns == 1
-            ):
-                result = self.bmg.add_to_real(node)
-            else:
-                result = self.bmg.add_to_real_matrix(node)
+            return self._meet_real_matrix_requirement(node, None, consumer, edge)
         elif requirement is bt.any_real_matrix:
             result = self.bmg.add_to_real_matrix(node)
         elif self._type_meets_requirement(node_type, bt.upper_bound(requirement)):

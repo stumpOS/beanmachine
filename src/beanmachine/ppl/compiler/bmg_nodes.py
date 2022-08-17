@@ -811,7 +811,7 @@ class ElementwiseMultiplyNode(BinaryOperatorNode):
         BinaryOperatorNode.__init__(self, left, right)
 
     def __str__(self) -> str:
-        return f"${self.left} * f{self.right}"
+        return f"{self.left} * {self.right}"
 
 
 class EqualNode(ComparisonNode):
@@ -1051,7 +1051,7 @@ class MatrixAddNode(BinaryOperatorNode):
         BinaryOperatorNode.__init__(self, left, right)
 
     def __str__(self) -> str:
-        return f"MatrixAdd(f{self.left}, f{self.right}"
+        return f"{self.left} + {self.right}"
 
 
 class MatrixScaleNode(BinaryOperatorNode):
