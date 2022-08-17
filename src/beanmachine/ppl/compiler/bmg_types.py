@@ -756,7 +756,6 @@ class AnyRealMatrix(BaseRequirement):
 
 any_real_matrix = AnyRealMatrix()
 
-
 # TODO: Memoize these, remove memoization of construction functions below.
 class UpperBound(BaseRequirement):
     bound: BMGLatticeType
