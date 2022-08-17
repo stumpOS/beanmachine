@@ -9,7 +9,7 @@ import torch
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.gen_bmg_graph import to_bmg_graph
 from beanmachine.ppl.compiler.gen_dot import to_dot
-from torch import Size, Tensor
+from torch import Size
 
 
 class FixMatrixAdditionTest(unittest.TestCase):
@@ -29,7 +29,7 @@ class FixMatrixAdditionTest(unittest.TestCase):
         exp = bmg.add_matrix_exp(matrix)
         mult = bmg.add_elementwise_multiplication(matrix, matrix)
         add = bmg.add_matrix_addition(exp, mult)
-        query = bmg.add_query(add)
+        bmg.add_query(add)
         observed = to_dot(bmg, after_transform=False)
         expectation = """
 digraph "graph" {
@@ -66,11 +66,11 @@ digraph "graph" {
   N09 -> N10[label=sigma];
   N10 -> N11[label=operand];
   N11 -> N12[label=right];
-  N12 -> N13[label=UNKNOWN];
-  N12 -> N14[label=UNKNOWN];
-  N12 -> N14[label=UNKNOWN];
-  N13 -> N15[label=UNKNOWN];
-  N14 -> N15[label=UNKNOWN];
+  N12 -> N13[label=operand];
+  N12 -> N14[label=left];
+  N12 -> N14[label=right];
+  N13 -> N15[label=left];
+  N14 -> N15[label=right];
   N15 -> N16[label=operator];
 }
                 """
@@ -115,12 +115,12 @@ digraph "graph" {
   N10 -> N11[label=operand];
   N11 -> N13[label=1];
   N12 -> N13[label=rows];
-  N13 -> N14[label=UNKNOWN];
-  N13 -> N16[label=UNKNOWN];
-  N13 -> N16[label=UNKNOWN];
+  N13 -> N14[label=operand];
+  N13 -> N16[label=left];
+  N13 -> N16[label=right];
   N14 -> N15[label=operand];
-  N15 -> N17[label=UNKNOWN];
-  N16 -> N17[label=UNKNOWN];
+  N15 -> N17[label=left];
+  N16 -> N17[label=right];
   N17 -> N18[label=operator];
 }
         """
@@ -195,7 +195,7 @@ digraph "graph" {
         add = bmg.add_matrix_addition(matrix, matrix)
         mult = bmg.add_matrix_addition(exp, add)
         sum = bmg.add_matrix_sum(mult)
-        query = bmg.add_query(sum)
+        bmg.add_query(sum)
         observed = to_dot(bmg, after_transform=False)
         expectation = """
 digraph "graph" {
@@ -233,12 +233,12 @@ digraph "graph" {
   N09 -> N10[label=sigma];
   N10 -> N11[label=operand];
   N11 -> N12[label=right];
-  N12 -> N13[label=UNKNOWN];
-  N12 -> N14[label=UNKNOWN];
-  N12 -> N14[label=UNKNOWN];
-  N13 -> N15[label=UNKNOWN];
-  N14 -> N15[label=UNKNOWN];
-  N15 -> N16[label=UNKNOWN];
+  N12 -> N13[label=operand];
+  N12 -> N14[label=left];
+  N12 -> N14[label=right];
+  N13 -> N15[label=left];
+  N14 -> N15[label=right];
+  N15 -> N16[label=operand];
   N16 -> N17[label=operator];
 }
                 """
@@ -284,13 +284,13 @@ digraph "graph" {
   N10 -> N11[label=operand];
   N11 -> N13[label=1];
   N12 -> N13[label=rows];
-  N13 -> N14[label=UNKNOWN];
-  N13 -> N16[label=UNKNOWN];
-  N13 -> N16[label=UNKNOWN];
+  N13 -> N14[label=operand];
+  N13 -> N16[label=left];
+  N13 -> N16[label=right];
   N14 -> N15[label=operand];
-  N15 -> N17[label=UNKNOWN];
-  N16 -> N17[label=UNKNOWN];
-  N17 -> N18[label=UNKNOWN];
+  N15 -> N17[label=left];
+  N16 -> N17[label=right];
+  N17 -> N18[label=operand];
   N18 -> N19[label=operator];
 }
         """
