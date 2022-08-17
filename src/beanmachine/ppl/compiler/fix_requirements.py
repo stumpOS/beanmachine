@@ -302,6 +302,7 @@ class RequirementsFixer:
         edge: str,
     ) -> bn.BMGNode:
         node_type = self._typer[node]
+        result = None
         if dim_req is not None:
             if dim_req[0] == 1 and dim_req[1] == 1:
                 if (
@@ -310,18 +311,6 @@ class RequirementsFixer:
                     and node_type.columns == 1
                 ):
                     result = self.bmg.add_to_real(node)
-                else:
-                    self.errors.add_error(
-                        Violation(
-                            node,
-                            node_type,
-                            bt.RealMatrix(1, 1),
-                            consumer,
-                            edge,
-                            self.bmg.execution_context.node_locations(consumer),
-                        )
-                    )
-                return node
             else:
                 if (
                     isinstance(node_type, bt.BMGMatrixType)
@@ -329,18 +318,6 @@ class RequirementsFixer:
                     and node_type.columns == dim_req[1]
                 ):
                     result = self.bmg.add_to_real_matrix(node)
-                else:
-                    self.errors.add_error(
-                        Violation(
-                            node,
-                            node_type,
-                            bt.RealMatrix(1, 1),
-                            consumer,
-                            edge,
-                            self.bmg.execution_context.node_locations(consumer),
-                        )
-                    )
-                return node
         else:
             if (
                 isinstance(node_type, bt.BMGMatrixType)
@@ -350,6 +327,18 @@ class RequirementsFixer:
                 result = self.bmg.add_to_real(node)
             else:
                 result = self.bmg.add_to_real_matrix(node)
+        if result is None:
+            self.errors.add_error(
+                Violation(
+                    node,
+                    node_type,
+                    bt.RealMatrix(1, 1),
+                    consumer,
+                    edge,
+                    self.bmg.execution_context.node_locations(consumer),
+                )
+            )
+            return node
         return result
 
     def _meet_operator_requirement(
