@@ -222,9 +222,16 @@ class BMGInference:
             assert all([len(r) == num_samples for r in raw])
             samples = [self._transpose_samples(r) for r in raw]
 
+        rv_to_query_map = {}
+        for rv, query in rt._rv_to_query.items():
+            if generated_graph.bmg.query_map.__contains__(query):
+                bmg_query = generated_graph.bmg.query_map[query]
+            else:
+                bmg_query = query
+            rv_to_query_map[rv] = bmg_query
         # TODO: Make _rv_to_query public. Add it to BMGraphBuilder?
         mcsamples = self._build_mcsamples(
-            rt._rv_to_query, samples, query_to_query_id, num_samples, num_chains
+            rv_to_query_map, samples, query_to_query_id, num_samples, num_chains
         )
 
         self._finish(prof.infer)

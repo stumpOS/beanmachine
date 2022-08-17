@@ -75,12 +75,15 @@ Scalar = Size([])
 
 # These nodes are always scalars no matter what their input:
 _always_scalar: Set[type] = {
+    bn.CategoricalNode,
+    bn.CategoricalLogitNode,
     bn.ExpProductFactorNode,
     bn.FlatNode,
     bn.InNode,
     bn.IsNode,
     bn.IsNotNode,
     bn.ItemNode,
+    bn.LogSumExpVectorNode,
     bn.NotInNode,
     bn.NotNode,
     bn.SumNode,
@@ -207,12 +210,16 @@ class Sizer(TyperBase[Size]):
         TyperBase.__init__(self)
         self._dispatch = {
             bn.ChoiceNode: self._size_choice,
+            bn.ColumnIndexNode: self._size_column,
             bn.IfThenElseNode: self._size_if,
             bn.IndexNode: self._size_index,
             bn.MatrixMultiplicationNode: self._size_mm,
             bn.SwitchNode: self._size_switch,
             bn.TensorNode: lambda n: n._size,
             bn.ToMatrixNode: self._size_to_matrix,
+            bn.LogSumExpNode: self._size_log_sum_exp_node,
+            bn.LogSumExpVectorNode: self._size_log_sum_exp_vector_node,
+            bn.LogSumExpTorchNode: self._size_log_sum_exp_torch_node,
         }
         # TODO:
         # ColumnIndexNode
@@ -291,6 +298,45 @@ class Sizer(TyperBase[Size]):
         if columns == 1:
             return Size([rows])
         return Size([columns, rows])
+
+    def _size_column(self, node: bn.ColumnIndexNode) -> Size:
+        size_tensor = self[node.inputs.inputs[0]]
+        # column size is always the last value of the shape since its the inner most group
+        return Size([size_tensor[len(size_tensor) - 1]])
+
+    def _size_log_sum_exp_vector_node(self, node: bn.LogSumExpVectorNode) -> Size:
+        # this expects a single-column matrix (and sums together all entries in the column?)
+        operand_size = self[node.operand]
+        dim = len(operand_size)
+        if dim <= 1:
+            return Scalar
+        else:
+            # TODO: is this possible given the expectation?
+            dims = []
+            for d in range(0, dim - 1):
+                dims.append(operand_size[d])
+            return Size(dims)
+
+    def _size_log_sum_exp_node(self, node: bn.LogSumExpNode) -> Size:
+        # expects a list of values and computes log(exp(v_1) + ... + exp(v_n))
+        # so, the size should be equal to the value size and all input sizes must be the same
+        if len(node.inputs.inputs) == 0:
+            return Unsized
+        operand_size = self[node.inputs.inputs[0]]
+        for operand in node.inputs.inputs:
+            if self[operand] != operand_size:
+                return Unsized
+
+        return operand_size
+
+    def _size_log_sum_exp_torch_node(self, node: bn.LogSumExpTorchNode) -> Size:
+        # it has three operands: the tensor being summed, the dimension along which it is summed, and a flag giving the shape
+        if len(node.inputs.inputs) != 3:
+            return Unsized
+        tensor_being_summed = node.inputs.inputs[0]
+        # TODO: we can't compute the size at compile time but we don't have a way to represent dynamic sizes in Size right now
+        # For now, just return original size
+        return self[tensor_being_summed]
 
     # This implements the abstract base type method.
     def _compute_type_inputs_known(self, node: bn.BMGNode) -> Size:

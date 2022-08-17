@@ -9,7 +9,7 @@ import beanmachine.ppl as bm
 from beanmachine.ppl.compiler.gen_bmg_cpp import to_bmg_cpp
 from beanmachine.ppl.compiler.gen_bmg_graph import to_bmg_graph
 from beanmachine.ppl.compiler.gen_bmg_python import to_bmg_python
-from beanmachine.ppl.compiler.gen_dot import to_dot
+from beanmachine.ppl.compiler.gen_dot import to_dot, to_dot_get_graph
 from beanmachine.ppl.compiler.runtime import BMGRuntime
 from torch import tensor
 from torch.distributions import Bernoulli, Normal
@@ -123,7 +123,7 @@ digraph "graph" {
     def test_lse2by3(self) -> None:
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph([f2by3()], {})
-        observed = to_dot(bmg, after_transform=True, label_edges=False)
+        bmg, observed = to_dot_get_graph(bmg, after_transform=True, label_edges=False)
         expected = """
 digraph "graph" {
   N00[label=0.0];

@@ -9,7 +9,7 @@ from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.gen_bmg_cpp import to_bmg_cpp
 from beanmachine.ppl.compiler.gen_bmg_graph import to_bmg_graph
 from beanmachine.ppl.compiler.gen_bmg_python import to_bmg_python
-from beanmachine.ppl.compiler.gen_dot import to_dot
+from beanmachine.ppl.compiler.gen_dot import to_dot_get_graph
 
 
 class ColumnIndexTest(unittest.TestCase):
@@ -31,7 +31,7 @@ class ColumnIndexTest(unittest.TestCase):
         lsev = bmg.add_logsumexp_vector(ci)
         bmg.add_query(lsev)
 
-        observed = to_dot(
+        bmg, observed = to_dot_get_graph(
             bmg,
             node_types=True,
             edge_requirements=True,
