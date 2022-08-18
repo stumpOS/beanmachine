@@ -120,7 +120,6 @@ class RequirementsFixer:
 
         if requirement == bt.RealMatrix:
             if isinstance(it, bt.RealMatrix):
-                assert isinstance(it, bt.BMGMatrixType)
                 return self.bmg.add_constant_of_matrix_type(node.value, it)
             else:
                 return self.bmg.add_real_matrix(node.value)
