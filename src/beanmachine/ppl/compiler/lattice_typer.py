@@ -184,6 +184,7 @@ class LatticeTyper(TyperBase[bt.BMGLatticeType]):
             bn.ToPositiveRealMatrixNode: self._type_to_pos_real_matrix,
             bn.ToRealMatrixNode: self._type_to_real_matrix,
             bn.VectorIndexNode: self._type_index,
+            bn.TensorNode: self._type_tensor_node,
             bn.TransposeNode: self._type_transpose,
         }
 
@@ -223,6 +224,31 @@ class LatticeTyper(TyperBase[bt.BMGLatticeType]):
         if bt.supremum(op_type, bt.PositiveReal) == bt.PositiveReal:
             return bt.PositiveRealMatrix(left_type.rows, left_type.columns)
         return bt.RealMatrix(left_type.rows, left_type.columns)
+
+    _matrix_tpe_constructors = {
+        bt.Real: lambda r, c: bt.RealMatrix(r, c),
+        bt.PositiveReal: lambda r, c: bt.PositiveRealMatrix(r, c),
+        bt.NegativeReal: lambda r, c: bt.NegativeRealMatrix(r, c),
+        bt.Probability: lambda r, c: bt.ProbabilityMatrix(r, c),
+        bt.Boolean: lambda r, c: bt.BooleanMatrix(r, c),
+        bt.NaturalMatrix: lambda r, c: bt.NaturalMatrix(r, c),
+    }
+
+    def _type_tensor_node(self, node: bn.TensorNode) -> bt.BMGLatticeType:
+        size = node._size
+        element_type = bt.supremum(*[self[i] for i in node.inputs])
+        if len(size) == 0:
+            return element_type
+        if len(size) == 1:
+            rows = 1
+            columns = size[0]
+        elif len(size) == 2:
+            rows = size[0]
+            columns = size[1]
+        else:
+            return bt.Untypable
+
+        return self._matrix_tpe_constructors[element_type](rows, columns)
 
     def _type_matrix_exp(self, node: bn.MatrixExpNode) -> bt.BMGLatticeType:
         assert len(node.inputs) == 1

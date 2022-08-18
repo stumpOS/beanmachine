@@ -193,7 +193,7 @@ digraph "graph" {
         matrix = bmg.add_tensor(Size([2]), *tensor_elements)
         exp = bmg.add_matrix_exp(matrix)
         add = bmg.add_matrix_addition(matrix, matrix)
-        mult = bmg.add_matrix_addition(exp, add)
+        mult = bmg.add_elementwise_multiplication(exp, add)
         sum = bmg.add_matrix_sum(mult)
         bmg.add_query(sum)
         observed = to_dot(bmg, after_transform=False)
@@ -214,7 +214,7 @@ digraph "graph" {
   N12[label=Tensor];
   N13[label=MatrixExp];
   N14[label=MatrixAdd];
-  N15[label=MatrixAdd];
+  N15[label=ElementwiseMult];
   N16[label=MatrixSum];
   N17[label=Query];
   N00 -> N02[label=left];
@@ -263,7 +263,7 @@ digraph "graph" {
   N14[label=MatrixExp];
   N15[label=ToRealMatrix];
   N16[label=MatrixAdd];
-  N17[label=MatrixAdd];
+  N17[label=ElementwiseMult];
   N18[label=MatrixSum];
   N19[label=Query];
   N00 -> N02[label=left];
@@ -317,7 +317,7 @@ digraph "graph" {
   N14[label="Operator"];
   N15[label="ToReal"];
   N16[label="MatrixAdd"];
-  N17[label="MatrixAdd"];
+  N17[label="ElementwiseMultiply"];
   N18[label="Operator"];
   N0 -> N2;
   N0 -> N8;
