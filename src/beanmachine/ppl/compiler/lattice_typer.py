@@ -228,7 +228,7 @@ class LatticeTyper(TyperBase[bt.BMGLatticeType]):
         assert len(node.inputs) == 1
         op = self[node.operand]
         assert op is not bt.Untypable
-        assert isinstance(op, bt.RealMatrix)
+        assert isinstance(op, bt.BMGMatrixType)
         return bt.PositiveRealMatrix(op.rows, op.columns)
 
     def _type_matrix_sum(self, node: bn.MatrixSumNode) -> bt.BMGLatticeType:
