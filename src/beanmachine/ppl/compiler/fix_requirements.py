@@ -11,7 +11,7 @@ or cannot be made to meet type requirements, an error report is
 returned."""
 
 
-from typing import Optional, Tuple
+from typing import Tuple
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
 import beanmachine.ppl.compiler.bmg_types as bt
