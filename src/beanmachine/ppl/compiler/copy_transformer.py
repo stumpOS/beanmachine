@@ -31,7 +31,7 @@ class CopyGraph(NodeTransformer):
             size = self.sizer[node]
             if size == Unsized:
                 transform = False
-        except RuntimeError as e:
+        except RuntimeError:
             transform = False
         if not transform:
             report.add_error(
