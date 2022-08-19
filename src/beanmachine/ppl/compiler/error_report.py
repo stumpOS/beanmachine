@@ -23,6 +23,8 @@ from beanmachine.ppl.compiler.bmg_types import (
 )
 from beanmachine.ppl.compiler.execution_context import FunctionCall
 from beanmachine.ppl.compiler.graph_labels import get_node_error_label
+
+from beanmachine.ppl.compiler.sizer import Size
 from beanmachine.ppl.utils.a_or_an import a_or_an, A_or_An
 
 
@@ -198,15 +200,17 @@ class UnsizableNode(BMGError):
     def __init__(
         self,
         node: BMGNode,
+        input_sizes: List[Size],
         node_locations: Set[FunctionCall],
     ) -> None:
         self.node = node
         self.node_locations = node_locations
+        self.input_sizes = input_sizes
 
     def __str__(self) -> str:
         msg = (
             f"The node {get_node_error_label(self.node)} cannot be sized."
-            f" Check the shapes of its operands to ensure they are compatible."
+            f"The operand sizes may be incompatible. The sizes are: {self.input_sizes}"
         )
 
         if len(self.node_locations) > 0:

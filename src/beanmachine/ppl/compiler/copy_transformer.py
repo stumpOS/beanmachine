@@ -26,14 +26,22 @@ class CopyGraph(NodeTransformer):
         self, node: bn.BMGNode, original: BMGraphBuilder
     ) -> TransformAssessment:
         report = ErrorReport()
-        if self.sizer[node] == Unsized:
+        transform = True
+        try:
+            size = self.sizer[node]
+            if size == Unsized:
+                transform = False
+        except RuntimeError as e:
+            transform = False
+        if not transform:
             report.add_error(
                 UnsizableNode(
                     node,
+                    [self.sizer[input] for input in node.inputs.inputs],
                     self.cloner.bmg_original.execution_context.node_locations(node),
                 )
             )
-        return TransformAssessment(True, ErrorReport())
+        return TransformAssessment(transform, report)
 
     def transform_node(
         self, node: bn.BMGNode, new_inputs: List[bn.BMGNode]
