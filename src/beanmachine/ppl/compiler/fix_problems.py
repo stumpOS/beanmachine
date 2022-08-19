@@ -7,6 +7,8 @@ from typing import Callable, List, Set, Tuple
 
 import beanmachine.ppl.compiler.profiler as prof
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
+
+from beanmachine.ppl.compiler.copy_transformer import copy
 from beanmachine.ppl.compiler.error_report import ErrorReport
 from beanmachine.ppl.compiler.fix_additions import addition_fixer, sum_fixer
 from beanmachine.ppl.compiler.fix_arithmetic import (
@@ -118,6 +120,7 @@ def fix_problems(
 
     all_fixers = sequential_graph_fixer(
         [
+            copy,
             vectorized_model_fixer(),
             arithmetic_graph_fixer(skip_optimizations),
             unsupported_node_reporter(),
