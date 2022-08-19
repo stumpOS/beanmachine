@@ -113,6 +113,7 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.ColumnIndexNode: bmg.add_column_index,
         bn.ComplementNode: bmg.add_complement,
         bn.DivisionNode: bmg.add_division,
+        bn.ElementwiseMultiplyNode: bmg.add_elementwise_multiplication,
         bn.EqualNode: bmg.add_equal,
         bn.Exp2Node: bmg.add_exp2,
         bn.ExpNode: bmg.add_exp,
@@ -140,8 +141,11 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.LogNode: bmg.add_log,
         bn.LogSumExpTorchNode: bmg.add_logsumexp_torch,
         bn.LShiftNode: bmg.add_lshift,
+        bn.MatrixAddNode: bmg.add_matrix_addition,
+        bn.MatrixExpNode: bmg.add_matrix_exp,
         bn.MatrixMultiplicationNode: bmg.add_matrix_multiplication,
         bn.MatrixScaleNode: bmg.add_matrix_scale,
+        bn.MatrixSumNode: bmg.add_matrix_sum,
         bn.ModNode: bmg.add_mod,
         bn.MultiplicationNode: bmg.add_multiplication,
         bn.NegateNode: bmg.add_negate,
@@ -162,6 +166,7 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.TransposeNode: bmg.add_transpose,
         bn.ToPositiveRealNode: bmg.add_to_positive_real,
         bn.ToRealNode: bmg.add_to_real,
+        bn.VectorIndexNode: bmg.add_vector_index,
     }
 
 
@@ -173,8 +178,13 @@ def _constant_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.RealNode: bmg.add_real,
         bn.PositiveRealNode: bmg.add_pos_real,
         bn.ProbabilityNode: bmg.add_probability,
-        bn.ConstantTensorNode: bmg.add_constant_tensor,
+        bn.ConstantBooleanMatrixNode: bmg.add_boolean_matrix,
+        bn.ConstantNaturalMatrixNode: bmg.add_natural_matrix,
+        bn.ConstantNegativeRealMatrixNode: bmg.add_neg_real_matrix,
+        bn.ConstantSimplexMatrixNode: bmg.add_simplex,
         bn.ConstantPositiveRealMatrixNode: bmg.add_pos_real_matrix,
+        bn.ConstantRealMatrixNode: bmg.add_real_matrix,
+        bn.ConstantTensorNode: bmg.add_constant_tensor,
         bn.UntypedConstantNode: bmg.add_constant,
     }
 

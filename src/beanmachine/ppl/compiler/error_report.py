@@ -191,6 +191,32 @@ class UntypableNode(BMGError):
         return msg
 
 
+class UnsizableNode(BMGError):
+    node: BMGNode
+    node_locations: Set[FunctionCall]
+
+    def __init__(
+        self,
+        node: BMGNode,
+        node_locations: Set[FunctionCall],
+    ) -> None:
+        self.node = node
+        self.node_locations = node_locations
+
+    def __str__(self) -> str:
+        msg = (
+            f"The node {get_node_error_label(self.node)} cannot be sized."
+            f" Check the shapes of its operands to ensure they are compatible."
+        )
+
+        if len(self.node_locations) > 0:
+            msg += "\nThe unsizable node was created in function call "
+            msg += ", ".join(sorted(str(loc) for loc in self.node_locations))
+            msg += "."
+
+        return msg
+
+
 class ErrorReport:
 
     errors: List[BMGError]

@@ -81,9 +81,9 @@ digraph "graph" {
         )
         expected = """
 digraph "graph" {
-  N00[label="1.0:OH"];
+  N00[label="0.5:P"];
   N01[label="2.0:N"];
-  N02[label="0.5:P"];
+  N02[label="1.0:OH"];
   N03[label="0.5:P"];
   N04[label="2.0:R+"];
   N05[label="Beta:P"];
@@ -187,8 +187,8 @@ digraph "graph" {
         )
         expected = """
 digraph "graph" {
-  N00[label="1.0:OH"];
-  N01[label="0.5:P"];
+  N00[label="0.5:P"];
+  N01[label="1.0:OH"];
   N02[label="0.5:P"];
   N03[label="Bernoulli:B"];
   N04[label="Sample:B"];
@@ -987,30 +987,30 @@ A binomial distribution is observed to have value 5.25 but only produces samples
         # The observations have been converted to the correct types:
         expected = """
 digraph "graph" {
-  N00[label="0.0:Z"];
-  N01[label="1.0:OH"];
-  N02[label="2.0:N"];
-  N03[label="0.5:P"];
-  N04[label="0.5:P"];
-  N05[label="Bernoulli:B"];
-  N06[label="Sample:B"];
-  N07[label="Observation False:B"];
-  N08[label="2:N"];
-  N09[label="Binomial:N"];
-  N10[label="Sample:N"];
-  N11[label="Observation 5:N"];
+  N00[label="0.5:P"];
+  N01[label="0.5:P"];
+  N02[label="Bernoulli:B"];
+  N03[label="Sample:B"];
+  N04[label="Observation False:B"];
+  N05[label="2.0:N"];
+  N06[label="2:N"];
+  N07[label="Binomial:N"];
+  N08[label="Sample:N"];
+  N09[label="Observation 5:N"];
+  N10[label="0.0:Z"];
+  N11[label="1.0:OH"];
   N12[label="0.0:R"];
   N13[label="1.0:R+"];
   N14[label="Normal:R"];
   N15[label="Sample:R"];
   N16[label="Observation 1.0:R"];
-  N04 -> N05[label="probability:P"];
-  N04 -> N09[label="probability:P"];
-  N05 -> N06[label="operand:B"];
-  N06 -> N07[label="operand:any"];
-  N08 -> N09[label="count:N"];
-  N09 -> N10[label="operand:N"];
-  N10 -> N11[label="operand:any"];
+  N01 -> N02[label="probability:P"];
+  N01 -> N07[label="probability:P"];
+  N02 -> N03[label="operand:B"];
+  N03 -> N04[label="operand:any"];
+  N06 -> N07[label="count:N"];
+  N07 -> N08[label="operand:N"];
+  N08 -> N09[label="operand:any"];
   N12 -> N14[label="mu:R"];
   N13 -> N14[label="sigma:R+"];
   N14 -> N15[label="operand:R"];

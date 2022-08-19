@@ -12,18 +12,27 @@ from beanmachine.ppl.compiler.copy_and_replace import (
     NodeTransformer,
     TransformAssessment,
 )
-from beanmachine.ppl.compiler.error_report import ErrorReport
+from beanmachine.ppl.compiler.error_report import ErrorReport, UnsizableNode
 from beanmachine.ppl.compiler.fix_problem import GraphFixerResult
-from beanmachine.ppl.compiler.sizer import Sizer
+from beanmachine.ppl.compiler.sizer import Sizer, Unsized
 
 
 class CopyGraph(NodeTransformer):
     def __init__(self, cloner: Cloner, sizer: Sizer):
+        self.sizer = sizer
         self.cloner = cloner
 
     def assess_node(
         self, node: bn.BMGNode, original: BMGraphBuilder
     ) -> TransformAssessment:
+        report = ErrorReport()
+        if self.sizer[node] == Unsized:
+            report.add_error(
+                UnsizableNode(
+                    node,
+                    self.cloner.bmg_original.execution_context.node_locations(node),
+                )
+            )
         return TransformAssessment(True, ErrorReport())
 
     def transform_node(
