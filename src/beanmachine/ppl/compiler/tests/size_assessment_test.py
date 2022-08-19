@@ -33,13 +33,11 @@ class SizeAssessmentTests(unittest.TestCase):
         matrix3by3 = bmg.add_real_matrix(
             torch.tensor([[0.21, 0.27, 0.3], [0.5, 0.6, 0.1], [0.8, 0.6, 0.9]])
         )
-        mm_invalid = bmg.add_matrix_multiplication(matrix2by2, matrix3by3)
-
-        # can be broadcast
         matrix1by3 = bmg.add_real_matrix(torch.tensor([[0.1, 0.2, 0.3]]))
         matrix2 = bmg.add_real_matrix(torch.tensor([0.1, 0.2]))
         scalar = bmg.add_real(4.5)
 
+        mm_invalid = bmg.add_matrix_multiplication(matrix2by2, matrix3by3)
         error_size_mismatch = assessor.size_error(mm_invalid, bmg)
         self.assertIsInstance(error_size_mismatch, BadMatrixMultiplication)
         expectation = """
@@ -47,9 +45,14 @@ The model uses a matrix multiplication (@) operation unsupported by Bean Machine
 The dimensions of the operands are 2x2 and 3x3.
         """
         self.assertEqual(expectation.strip(), error_size_mismatch.__str__().strip())
+
+        broadcast_not_supported_yet = bmg.add_matrix_multiplication(matrix2by2, matrix1by3)
+        expectation = """"""
+
+        self.assertEqual(expectation.strip(), broadcast_not_supported_yet.__str__().strip())
         errors = [
             assessor.size_error(bmg.add_matrix_multiplication(matrix2by2, mm), bmg)
-            for mm in [matrix1by3, matrix2, scalar]
+            for mm in [matrix2, scalar]
         ]
         for error in errors:
             self.assertIsNone(error)
