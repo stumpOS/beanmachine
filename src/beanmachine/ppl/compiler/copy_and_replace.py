@@ -45,7 +45,7 @@ class Cloner:
 
     def clone(self, original: bn.BMGNode, parents: List[bn.BMGNode]) -> bn.BMGNode:
         if self.value_factories.__contains__(type(original)):
-            if hasattr(original, "value"):
+            if isinstance(original, bn.ConstantNode):
                 image = self.value_factories[type(original)](original.value)
             else:
                 raise ValueError(
