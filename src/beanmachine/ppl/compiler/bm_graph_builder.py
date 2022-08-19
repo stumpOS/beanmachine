@@ -14,6 +14,7 @@ import torch
 import torch.distributions as dist
 from beanmachine.ppl.compiler.bmg_nodes import BMGNode, ConstantNode
 from beanmachine.ppl.compiler.execution_context import ExecutionContext
+from beanmachine.ppl.model.rv_identifier import RVIdentifier
 from beanmachine.ppl.utils.memoize import memoize
 
 
@@ -1149,3 +1150,16 @@ class BMGraphBuilder:
             (n for n in self._nodes if isinstance(n, bn.Observation)),
             key=lambda n: self._nodes[n],
         )
+
+
+def rv_to_original_query(
+    bmg: BMGraphBuilder, rv_to_query: Dict[RVIdentifier, BMGNode]
+) -> Dict[RVIdentifier, bn.Query]:
+    rv_to_query_map = {}
+    for rv, query in rv_to_query.items():
+        if bmg.query_map.__contains__(query):
+            bmg_query = bmg.query_map[query]
+        else:
+            bmg_query = query
+        rv_to_query_map[rv] = bmg_query
+    return rv_to_query_map

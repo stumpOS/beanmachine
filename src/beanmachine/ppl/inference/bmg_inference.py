@@ -8,11 +8,13 @@ inferences on Bean Machine models."""
 
 from typing import Dict, List, Optional, Set, Tuple
 
+from beanmachine.ppl.compiler.bm_graph_builder import rv_to_original_query
 import beanmachine.ppl.compiler.performance_report as pr
 import beanmachine.ppl.compiler.profiler as prof
 import graphviz
 import torch
 from beanmachine.graph import Graph, InferConfig, InferenceType
+from beanmachine.ppl.compiler.bmg_nodes import Query
 from beanmachine.ppl.compiler.fix_problems import default_skip_optimizations
 from beanmachine.ppl.compiler.gen_bmg_cpp import to_bmg_cpp
 from beanmachine.ppl.compiler.gen_bmg_graph import to_bmg_graph
@@ -222,13 +224,8 @@ class BMGInference:
             assert all([len(r) == num_samples for r in raw])
             samples = [self._transpose_samples(r) for r in raw]
 
-        rv_to_query_map = {}
-        for rv, query in rt._rv_to_query.items():
-            if generated_graph.bmg.query_map.__contains__(query):
-                bmg_query = generated_graph.bmg.query_map[query]
-            else:
-                bmg_query = query
-            rv_to_query_map[rv] = bmg_query
+        rv_to_query_map = rv_to_original_query(generated_graph.bmg, rt._rv_to_query)
+
         # TODO: Make _rv_to_query public. Add it to BMGraphBuilder?
         mcsamples = self._build_mcsamples(
             rv_to_query_map, samples, query_to_query_id, num_samples, num_chains
@@ -359,6 +356,7 @@ class BMGInference:
         generated_graph = to_bmg_graph(bmg)
         g = generated_graph.graph
         query_to_query_id = generated_graph.query_to_query_id
-        rv_to_query = rt._rv_to_query
-        rv_to_query_id = {rv: query_to_query_id[rv_to_query[rv]] for rv in queries}
+        rv_to_query_map = rv_to_original_query(generated_graph.bmg, rt._rv_to_query)
+        rv_to_query_id = {rv: query_to_query_id[rv_to_query_map[rv]] for rv in queries}
+
         return g, rv_to_query_id
