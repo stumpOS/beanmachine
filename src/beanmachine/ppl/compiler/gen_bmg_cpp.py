@@ -185,6 +185,7 @@ class GeneratedGraphCPP:
     def _generate_cpp(self) -> None:
         bmg, error_report = fix_problems(self.bmg)
         error_report.raise_errors()
+        self.bmg = bmg
         for node in self.bmg.all_ancestor_nodes():
             self._generate_node(node)
         self.code = "\n".join(self._code)
