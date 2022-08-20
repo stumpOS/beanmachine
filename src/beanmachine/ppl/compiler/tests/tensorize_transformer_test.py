@@ -59,7 +59,7 @@ def non_matrix_tensor_mult_lhs():
 
 @bm.functional
 def non_matrix_tensor_mult_rhs():
-    return norm(2) * make_tensor(1)
+    return norm(6) * make_tensor(5)
 
 
 @bm.functional
@@ -145,15 +145,90 @@ digraph "graph" {
         self.assertEqual(expected_before.strip(), before.strip())
         self.assertEqual(expected_after.strip(), after.strip())
 
-    def test_transformed(self) -> None:
+    def test_matrix_scale(self) -> None:
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph(
-            [matrix_scale_rhs(), matrix_scale_lhs()], {}
+            [
+                matrix_scale_rhs(),
+                matrix_scale_lhs(),
+                non_matrix_tensor_mult_lhs(),
+                non_matrix_tensor_mult_rhs(),
+            ],
+            {},
         )
         transformed_graph, error_report = copy_and_replace(
             bmg, lambda c, s: Tensorizer(c, s)
         )
-        observed = to_dot(transformed_graph)
+        before = to_dot(bmg)
+        expected = """
+digraph "graph" {
+  N00[label=0.0];
+  N01[label=1.0];
+  N02[label=Normal];
+  N03[label=Sample];
+  N04[label=Sample];
+  N05[label=1.25];
+  N06[label=Tensor];
+  N07[label="*"];
+  N08[label=Query];
+  N09[label=Tensor];
+  N10[label="*"];
+  N11[label=Query];
+  N12[label=2.35];
+  N13[label=Tensor];
+  N14[label="*"];
+  N15[label=Query];
+  N16[label=Sample];
+  N17[label=Sample];
+  N18[label=Tensor];
+  N19[label="*"];
+  N20[label=Query];
+  N00 -> N02[label=mu];
+  N01 -> N02[label=sigma];
+  N02 -> N03[label=operand];
+  N02 -> N04[label=operand];
+  N02 -> N16[label=operand];
+  N02 -> N17[label=operand];
+  N03 -> N07[label=left];
+  N03 -> N09[label=0];
+  N03 -> N09[label=1];
+  N03 -> N09[label=2];
+  N03 -> N13[label=0];
+  N03 -> N13[label=1];
+  N03 -> N13[label=2];
+  N03 -> N13[label=4];
+  N03 -> N13[label=5];
+  N03 -> N13[label=6];
+  N04 -> N06[label=0];
+  N04 -> N06[label=1];
+  N04 -> N06[label=2];
+  N04 -> N10[label=right];
+  N04 -> N14[label=right];
+  N05 -> N06[label=3];
+  N05 -> N09[label=3];
+  N05 -> N13[label=7];
+  N05 -> N18[label=7];
+  N06 -> N07[label=right];
+  N07 -> N08[label=operator];
+  N09 -> N10[label=left];
+  N10 -> N11[label=operator];
+  N12 -> N13[label=3];
+  N12 -> N18[label=3];
+  N13 -> N14[label=left];
+  N14 -> N15[label=operator];
+  N16 -> N19[label=left];
+  N17 -> N18[label=0];
+  N17 -> N18[label=1];
+  N17 -> N18[label=2];
+  N17 -> N18[label=4];
+  N17 -> N18[label=5];
+  N17 -> N18[label=6];
+  N18 -> N19[label=right];
+  N19 -> N20[label=operator];
+}
+        """
+        self.assertEqual(expected.strip(), before.strip())
+        after = to_dot(transformed_graph)
         expected = """
 digraph "graph" {
   N00[label=0.0];
@@ -168,32 +243,65 @@ digraph "graph" {
   N09[label=Tensor];
   N10[label=MatrixScale];
   N11[label=Query];
+  N12[label=2.35];
+  N13[label=Tensor];
+  N14[label=MatrixScale];
+  N15[label=Query];
+  N16[label=Sample];
+  N17[label=Sample];
+  N18[label=Tensor];
+  N19[label=MatrixScale];
+  N20[label=Query];
   N00 -> N02[label=mu];
   N01 -> N02[label=sigma];
   N02 -> N03[label=operand];
   N02 -> N04[label=operand];
+  N02 -> N16[label=operand];
+  N02 -> N17[label=operand];
   N03 -> N07[label=left];
   N03 -> N09[label=0];
   N03 -> N09[label=1];
   N03 -> N09[label=2];
+  N03 -> N13[label=0];
+  N03 -> N13[label=1];
+  N03 -> N13[label=2];
+  N03 -> N13[label=4];
+  N03 -> N13[label=5];
+  N03 -> N13[label=6];
   N04 -> N06[label=0];
   N04 -> N06[label=1];
   N04 -> N06[label=2];
   N04 -> N10[label=left];
+  N04 -> N14[label=left];
   N05 -> N06[label=3];
   N05 -> N09[label=3];
+  N05 -> N13[label=7];
+  N05 -> N18[label=7];
   N06 -> N07[label=right];
   N07 -> N08[label=operator];
   N09 -> N10[label=right];
   N10 -> N11[label=operator];
+  N12 -> N13[label=3];
+  N12 -> N18[label=3];
+  N13 -> N14[label=right];
+  N14 -> N15[label=operator];
+  N16 -> N19[label=left];
+  N17 -> N18[label=0];
+  N17 -> N18[label=1];
+  N17 -> N18[label=2];
+  N17 -> N18[label=4];
+  N17 -> N18[label=5];
+  N17 -> N18[label=6];
+  N18 -> N19[label=right];
+  N19 -> N20[label=operator];
 }
         """
-        self.assertEqual(expected.strip(), observed.strip())
+        self.assertEqual(expected.strip(), after.strip())
 
     def test_not_transformed(self) -> None:
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph(
-            [scalar_mult(), non_matrix_tensor_mult_lhs(), non_matrix_tensor_mult_rhs()],
+            [scalar_mult()],
             {},
         )
         transformed_graph, error_report = copy_and_replace(
@@ -202,41 +310,20 @@ digraph "graph" {
         observed = to_dot(transformed_graph)
         expected = """
 digraph "graph" {
-  N00[label=0.0];
-  N01[label=1.0];
-  N02[label=Normal];
-  N03[label=Sample];
-  N04[label=Sample];
-  N05[label="*"];
-  N06[label=Query];
-  N07[label=2.35];
-  N08[label=1.25];
-  N09[label=Tensor];
-  N10[label="*"];
-  N11[label=Query];
-  N12[label="*"];
-  N13[label=Query];
-  N00 -> N02[label=mu];
-  N01 -> N02[label=sigma];
-  N02 -> N03[label=operand];
-  N02 -> N04[label=operand];
-  N03 -> N05[label=left];
-  N03 -> N09[label=0];
-  N03 -> N09[label=1];
-  N03 -> N09[label=2];
-  N03 -> N09[label=4];
-  N03 -> N09[label=5];
-  N03 -> N09[label=6];
-  N04 -> N05[label=right];
-  N04 -> N10[label=right];
-  N04 -> N12[label=left];
-  N05 -> N06[label=operator];
-  N07 -> N09[label=3];
-  N08 -> N09[label=7];
-  N09 -> N10[label=left];
-  N09 -> N12[label=right];
-  N10 -> N11[label=operator];
-  N12 -> N13[label=operator];
+  N0[label=0.0];
+  N1[label=1.0];
+  N2[label=Normal];
+  N3[label=Sample];
+  N4[label=Sample];
+  N5[label="*"];
+  N6[label=Query];
+  N0 -> N2[label=mu];
+  N1 -> N2[label=sigma];
+  N2 -> N3[label=operand];
+  N2 -> N4[label=operand];
+  N3 -> N5[label=left];
+  N4 -> N5[label=right];
+  N5 -> N6[label=operator];
 }
         """
         self.assertEqual(expected.strip(), observed.strip())
