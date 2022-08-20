@@ -17,7 +17,9 @@ class SizeAssessmentTests(unittest.TestCase):
     def test_matrix_mult(self):
         bmg = BMGraphBuilder()
         assessor = SizeAssessment(Sizer())
-        probs = bmg.add_real_matrix(torch.tensor([[0.5, 0.125, 0.125], [0.0625, 0.0625, 0.875]]))
+        probs = bmg.add_real_matrix(
+            torch.tensor([[0.5, 0.125, 0.125], [0.0625, 0.0625, 0.875]])
+        )
         tensor_elements = []
         for row in range(0, 2):
             row_node = bmg.add_natural(row)
@@ -46,13 +48,19 @@ The dimensions of the operands are 2x3 and 2x3.
         """
         self.assertEqual(expectation.strip(), error_size_mismatch.__str__().strip())
 
-        broadcast_not_supported_yet = bmg.add_matrix_multiplication(matrix2by3_rhs, matrix1by3)
-        error_broadcast_not_supported_yet = assessor.size_error(broadcast_not_supported_yet, bmg)
+        broadcast_not_supported_yet = bmg.add_matrix_multiplication(
+            matrix2by3_rhs, matrix1by3
+        )
+        error_broadcast_not_supported_yet = assessor.size_error(
+            broadcast_not_supported_yet, bmg
+        )
         expectation = """
 The model uses a matrix multiplication (@) operation unsupported by Bean Machine Graph.
 The dimensions of the operands are 2x3 and 1x3.
         """
-        self.assertEqual(expectation.strip(), error_broadcast_not_supported_yet.__str__().strip())
+        self.assertEqual(
+            expectation.strip(), error_broadcast_not_supported_yet.__str__().strip()
+        )
         errors = [
             assessor.size_error(bmg.add_matrix_multiplication(matrix2by3_rhs, mm), bmg)
             for mm in [matrix3, scalar]

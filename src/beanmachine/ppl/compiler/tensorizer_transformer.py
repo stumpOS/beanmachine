@@ -42,7 +42,7 @@ class Tensorizer(NodeTransformer):
         }
         self.transform_map = {
             bn.AdditionNode: lambda node, inputs: self._tensorize_binary_elementwise(
-                node, inputs, self.cloner.bmg.add_elementwise_addition
+                node, inputs, self.cloner.bmg.add_matrix_addition
             ),
             bn.MultiplicationNode: self._tensorize_multiply,
             bn.DivisionNode: self._tensorize_div,
@@ -77,9 +77,7 @@ class Tensorizer(NodeTransformer):
         ):
             current = new_inputs[0]
             for i in range(1, len(new_inputs)):
-                current = self.cloner.bmg.add_elementwise_addition(
-                    current, new_inputs[i]
-                )
+                current = self.cloner.bmg.add_matrix_addition(current, new_inputs[i])
             return self.cloner.bmg.add_matrix_sum(current)
         return self.cloner.bmg.add_sum(*new_inputs)
 

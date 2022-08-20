@@ -9,7 +9,7 @@ import beanmachine.ppl.compiler.bmg_nodes as bn
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.bmg_types import BMGElementType, BMGMatrixType
 from beanmachine.ppl.compiler.error_report import BadMatrixMultiplication, BMGError
-from beanmachine.ppl.compiler.sizer import is_scalar, Sizer, Size
+from beanmachine.ppl.compiler.sizer import is_scalar, Size, Sizer
 
 untypeable_element = BMGElementType("U", "untyped")
 
@@ -57,13 +57,13 @@ class SizeAssessment:
                     # will translate the size into column major form. Since the user is writing in
                     # a row major api, we present the error message in row major form. We don't care about the
                     # element type in this case
-                    def get_matrix_type(sz:Size) -> BMGMatrixType:
+                    def get_matrix_type(sz: Size) -> BMGMatrixType:
                         rows = 1
                         cols = 1
                         length = len(sz)
                         if length >= 2:
-                            rows = sz[length-2]
-                            cols = sz[length-1]
+                            rows = sz[length - 2]
+                            cols = sz[length - 1]
                         elif length == 1:
                             rows = sz[0]
                         return BMGMatrixType(
@@ -71,7 +71,10 @@ class SizeAssessment:
                         )
 
                     error = BadMatrixMultiplication(
-                        node, get_matrix_type(lhs_size), get_matrix_type(rhs_size), context.execution_context.node_locations(node)
+                        node,
+                        get_matrix_type(lhs_size),
+                        get_matrix_type(rhs_size),
+                        context.execution_context.node_locations(node),
                     )
 
         return error

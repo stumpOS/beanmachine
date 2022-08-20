@@ -33,6 +33,11 @@ def make_tensor(n):
 
 
 @bm.functional
+def operators_are_tensorized():
+    return (make_matrix(0) + make_matrix(1)).exp().sum()
+
+
+@bm.functional
 def matrix_scale_lhs():
     return make_matrix(1) * norm(2)
 
@@ -63,6 +68,83 @@ def mm_mismatch():
 
 
 class TensorizeTransformerTest(unittest.TestCase):
+    def test_tensor_operators(self) -> None:
+        self.maxDiff = None
+        bmg = BMGRuntime().accumulate_graph([operators_are_tensorized()], {})
+        transformed_graph, error_report = copy_and_replace(
+            bmg, lambda c, s: Tensorizer(c, s)
+        )
+        before = to_dot(bmg)
+        after = to_dot(transformed_graph)
+        expected_before = """
+        digraph "graph" {
+  N00[label=0.0];
+  N01[label=1.0];
+  N02[label=Normal];
+  N03[label=Sample];
+  N04[label=1.25];
+  N05[label=Tensor];
+  N06[label=Sample];
+  N07[label=Tensor];
+  N08[label="+"];
+  N09[label=Exp];
+  N10[label=Sum];
+  N11[label=Query];
+  N00 -> N02[label=mu];
+  N01 -> N02[label=sigma];
+  N02 -> N03[label=operand];
+  N02 -> N06[label=operand];
+  N03 -> N05[label=0];
+  N03 -> N05[label=1];
+  N03 -> N05[label=2];
+  N04 -> N05[label=3];
+  N04 -> N07[label=3];
+  N05 -> N08[label=left];
+  N06 -> N07[label=0];
+  N06 -> N07[label=1];
+  N06 -> N07[label=2];
+  N07 -> N08[label=right];
+  N08 -> N09[label=operand];
+  N09 -> N10[label=operand];
+  N10 -> N11[label=operator];
+}
+        """
+        expected_after = """
+digraph "graph" {
+  N00[label=0.0];
+  N01[label=1.0];
+  N02[label=Normal];
+  N03[label=Sample];
+  N04[label=1.25];
+  N05[label=Tensor];
+  N06[label=Sample];
+  N07[label=Tensor];
+  N08[label=MatrixAdd];
+  N09[label=MatrixExp];
+  N10[label=MatrixSum];
+  N11[label=Query];
+  N00 -> N02[label=mu];
+  N01 -> N02[label=sigma];
+  N02 -> N03[label=operand];
+  N02 -> N06[label=operand];
+  N03 -> N05[label=0];
+  N03 -> N05[label=1];
+  N03 -> N05[label=2];
+  N04 -> N05[label=3];
+  N04 -> N07[label=3];
+  N05 -> N08[label=left];
+  N06 -> N07[label=0];
+  N06 -> N07[label=1];
+  N06 -> N07[label=2];
+  N07 -> N08[label=right];
+  N08 -> N09[label=operand];
+  N09 -> N10[label=operand];
+  N10 -> N11[label=operator];
+}
+        """
+        self.assertEqual(expected_before.strip(), before.strip())
+        self.assertEqual(expected_after.strip(), after.strip())
+
     def test_transformed(self) -> None:
         self.maxDiff = None
         bmg = BMGRuntime().accumulate_graph(
