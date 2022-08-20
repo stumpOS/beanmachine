@@ -22,8 +22,6 @@ class SizeAssessment:
         self, node: bn.BMGNode, context: BMGraphBuilder
     ) -> Optional[BMGError]:
         error = None
-        # enable registering size sensitive verification checks for certain nodes
-        # otherwise the sizer will be unable to determine a size which is necessary for tensorization
         if isinstance(node, bn.MatrixMultiplicationNode):
             lhs = node.inputs.inputs[0]
             rhs = node.inputs.inputs[1]
@@ -34,8 +32,6 @@ class SizeAssessment:
             if not (is_scalar(lhs_size) or is_scalar(rhs_size)):
                 l_rhs = len(rhs_size)
                 l_lhs = len(lhs_size)
-                # todo: consider case where the rhs is a row or the lhs is a column
-                # todo: make more general functions to improve readability
                 rhs_can_be_considered_column = (
                     l_rhs == 1 and l_lhs == 2 and lhs_size[1] == rhs_size[0]
                 )
