@@ -1153,7 +1153,7 @@ class BMGraphBuilder:
 
 
 def rv_to_original_query(
-    bmg: BMGraphBuilder, rv_to_query: Dict[RVIdentifier, BMGNode]
+    bmg: BMGraphBuilder, rv_to_query: Dict[RVIdentifier, bn.Query]
 ) -> Dict[RVIdentifier, bn.Query]:
     rv_to_query_map = {}
     for rv, query in rv_to_query.items():
