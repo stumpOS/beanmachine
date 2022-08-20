@@ -9,7 +9,6 @@ import beanmachine.ppl.compiler.bmg_nodes as bn
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.bmg_types import BMGElementType, BMGMatrixType
 from beanmachine.ppl.compiler.error_report import BadMatrixMultiplication, BMGError
-from beanmachine.ppl.compiler.lattice_typer import LatticeTyper
 from beanmachine.ppl.compiler.sizer import is_scalar, Sizer
 
 untypeable_element = BMGElementType("U", "untyped")
@@ -29,8 +28,8 @@ class SizeAssessment:
             lhs = node.inputs.inputs[0]
             rhs = node.inputs.inputs[1]
 
-            lhs_size = self.sizer[node.inputs.inputs[0]]
-            rhs_size = self.sizer[node.inputs.inputs[1]]
+            lhs_size = self.sizer[lhs]
+            rhs_size = self.sizer[rhs]
 
             if not (is_scalar(lhs_size) or is_scalar(rhs_size)):
                 l_rhs = len(rhs_size)
@@ -54,20 +53,16 @@ class SizeAssessment:
                     or lhs_can_be_considered_row
                     or can_be_inner_product
                 ):
-                    typer = LatticeTyper()
-                    # type and correct the types. We only care about dimensions so if the
-                    # typer cannot type it we just add dummy values for element types that
-                    # are undecipherable
-                    lt = typer[lhs]
-                    if not isinstance(lt, BMGMatrixType):
-                        lt = BMGMatrixType(
-                            untypeable_element, "", "", lhs_size[0], lhs_size[1]
-                        )
-                    rt = typer[rhs]
-                    if not isinstance(rt, BMGMatrixType):
-                        rt = BMGMatrixType(
-                            untypeable_element, "", "", rhs_size[0], rhs_size[1]
-                        )
+                    # Do NOT use the Lattice typer. the BMGMatrix type constructor
+                    # will translate the size into column major form. Since the user is writing in
+                    # a row major api, we present the error message in row major form. We don't care about the
+                    # element type in this case
+                    lt = BMGMatrixType(
+                        untypeable_element, "", "", rows=lhs_size[0], columns=lhs_size[1]
+                    )
+                    rt = BMGMatrixType(
+                        untypeable_element, "", "", rows=rhs_size[0], columns=rhs_size[1]
+                    )
                     error = BadMatrixMultiplication(
                         node, lt, rt, context.execution_context.node_locations(node)
                     )

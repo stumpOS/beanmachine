@@ -42,15 +42,17 @@ class SizeAssessmentTests(unittest.TestCase):
         self.assertIsInstance(error_size_mismatch, BadMatrixMultiplication)
         expectation = """
 The model uses a matrix multiplication (@) operation unsupported by Bean Machine Graph.
-The dimensions of the operands are 2x2 and 3x3.
+The dimensions of the operands are 2x3 and 2x3.
         """
         self.assertEqual(expectation.strip(), error_size_mismatch.__str__().strip())
 
         broadcast_not_supported_yet = bmg.add_matrix_multiplication(matrix2by3_rhs, matrix1by3)
         error_broadcast_not_supported_yet = assessor.size_error(broadcast_not_supported_yet, bmg)
-        expectation = """"""
-
-        self.assertEqual(expectation.strip(), broadcast_not_supported_yet.__str__().strip())
+        expectation = """
+The model uses a matrix multiplication (@) operation unsupported by Bean Machine Graph.
+The dimensions of the operands are 2x3 and 1x3.
+        """
+        self.assertEqual(expectation.strip(), error_broadcast_not_supported_yet.__str__().strip())
         errors = [
             assessor.size_error(bmg.add_matrix_multiplication(matrix2by3_rhs, mm), bmg)
             for mm in [matrix3, scalar]
