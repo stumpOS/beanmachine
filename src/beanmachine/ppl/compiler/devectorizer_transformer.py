@@ -43,6 +43,7 @@ _binary_tensor_ops = [bn.ElementwiseMultiplyNode, bn.MatrixAddNode]
 
 _tensor_constants = [
     bn.ConstantPositiveRealMatrixNode,
+    bn.ConstantRealMatrixNode,
     bn.ConstantTensorNode,
     bn.UntypedConstantNode,
 ]
