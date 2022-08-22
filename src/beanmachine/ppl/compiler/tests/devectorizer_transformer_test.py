@@ -412,10 +412,10 @@ digraph "graph" {
         if len(error_report.errors) == 1:
             error = error_report.errors[0].__str__()
             expected = """
-The node log_prob cannot be sized. Check the shapes of its operands to ensure they are compatible.
+The node log_prob cannot be sized.The operand sizes may be incompatible. The sizes are: [torch.Size([2]), torch.Size([3])]
 The unsizable node was created in function call unsizable().
             """
-            self.assertEqual(error.strip(), expected.strip())
+            self.assertEqual(expected.strip(), error.strip())
         else:
             self.fail(
                 "A single error message should have been generated since the sizer cannot size every node"

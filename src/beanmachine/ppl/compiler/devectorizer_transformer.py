@@ -424,7 +424,11 @@ class Devectorizer(NodeTransformer):
         if self.sizer[node] == Unsized:
             report = ErrorReport()
             report.add_error(
-                UnsizableNode(node, original.execution_context.node_locations(node))
+                UnsizableNode(
+                    node,
+                    [self.sizer[p] for p in node.inputs.inputs],
+                    original.execution_context.node_locations(node),
+                )
             )
             return TransformAssessment(False, report)
         return TransformAssessment(True, ErrorReport())
