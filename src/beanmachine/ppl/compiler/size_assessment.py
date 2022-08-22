@@ -7,11 +7,9 @@ from typing import Optional
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
-from beanmachine.ppl.compiler.bmg_types import BMGElementType, BMGMatrixType
+from beanmachine.ppl.compiler.bmg_types import BMGMatrixType, RealMatrix
 from beanmachine.ppl.compiler.error_report import BadMatrixMultiplication, BMGError
 from beanmachine.ppl.compiler.sizer import is_scalar, Size, Sizer
-
-untypeable_element = BMGElementType("U", "untyped")
 
 
 class SizeAssessment:
@@ -62,9 +60,7 @@ class SizeAssessment:
                             cols = sz[length - 1]
                         elif length == 1:
                             rows = sz[0]
-                        return BMGMatrixType(
-                            untypeable_element, "", "", rows=rows, columns=cols
-                        )
+                        return RealMatrix(rows, cols)
 
                     error = BadMatrixMultiplication(
                         node,

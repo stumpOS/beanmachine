@@ -405,7 +405,11 @@ class Devectorizer(NodeTransformer):
 
     def __add_observation(self, inputs: List[bn.BMGNode], value: Any) -> bn.Observation:
         assert len(inputs) == 1
-        return self.cloner.bmg.add_observation(inputs[0], value)
+        sample = inputs[0]
+        if isinstance(sample, bn.SampleNode):
+            return self.cloner.bmg.add_observation(sample, value)
+        else:
+            raise ValueError("expected a sample as a parent to an observation")
 
     def _devectorize(self, node: bn.BMGNode) -> List[bn.BMGNode]:
         # there are two ways to devectorize a node: (1) we can scatter it or (2) we can split it (clone and index)
