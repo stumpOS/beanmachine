@@ -75,7 +75,6 @@ class BMGraphBuilder:
         self._node_counter = 0
         self._pd = None
         self.execution_context = execution_context
-        self.query_map = {}
 
     def _begin(self, s: str) -> None:
         pd = self._pd
@@ -1007,13 +1006,13 @@ class BMGraphBuilder:
         return node
 
     @memoize
-    def add_query(self, operator: BMGNode) -> bn.Query:
+    def add_query(self, operator: BMGNode, rvidentifier: RVIdentifier) -> bn.Query:
         # TODO: BMG requires that the target of a query be classified
         # as an operator and that queries be unique; that is, every node
         # is queried *exactly* zero or one times. Rather than making
         # those restrictions here, instead detect bad queries in the
         # problem fixing phase and report accordingly.
-        node = bn.Query(operator)
+        node = bn.Query(operator, rvidentifier)
         self.add_node(node)
         return node
 
@@ -1152,14 +1151,9 @@ class BMGraphBuilder:
         )
 
 
-def rv_to_original_query(
-    bmg: BMGraphBuilder, rv_to_query: Dict[RVIdentifier, bn.Query]
-) -> Dict[RVIdentifier, bn.Query]:
-    rv_to_query_map = {}
-    for rv, query in rv_to_query.items():
-        if bmg.query_map.__contains__(query):
-            bmg_query = bmg.query_map[query]
-        else:
-            bmg_query = query
-        rv_to_query_map[rv] = bmg_query
+def rv_to_query(bmg: BMGraphBuilder) -> Dict[RVIdentifier, bn.Query]:
+    rv_to_query_map: Dict[RVIdentifier, bn.Query] = {}
+    for node in bmg.all_nodes():
+        if isinstance(node, bn.Query):
+            rv_to_query_map[node.rv_identifier] = node
     return rv_to_query_map

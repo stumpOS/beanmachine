@@ -52,15 +52,6 @@ class Cloner:
                 raise ValueError(
                     f"Internal compiler error. The type f{type(original)} should not be in the value factory because it does not have a value attribute"
                 )
-        elif isinstance(original, bn.Query):
-            assert len(parents) == 1
-            image = self.bmg.add_query(parents[0])
-            key = original
-            for k, v in self.bmg_original.query_map.items():
-                if v == original:
-                    key = k
-                    break
-            self.bmg.query_map[key] = image
         elif isinstance(original, bn.Observation):
             assert len(parents) == 1
             sample = parents[0]
@@ -68,6 +59,9 @@ class Cloner:
                 image = self.bmg.add_observation(sample, original.value)
             else:
                 raise ValueError("observations must have a sample operand")
+        elif isinstance(original, bn.Query):
+            assert len(parents) == 1
+            return self.bmg.add_query(parents[0], original.rv_identifier)
         elif isinstance(original, bn.TensorNode):
             image = self.bmg.add_tensor(self.sizer[original], *parents)
         else:
@@ -155,7 +149,6 @@ def _node_factories(bmg: BMGraphBuilder) -> Dict[Type, Callable]:
         bn.NotInNode: bmg.add_not_in,
         bn.PhiNode: bmg.add_phi,
         bn.PowerNode: bmg.add_power,
-        bn.Query: bmg.add_query,
         bn.RShiftNode: bmg.add_rshift,
         bn.SampleNode: bmg.add_sample,
         bn.SquareRootNode: bmg.add_squareroot,
