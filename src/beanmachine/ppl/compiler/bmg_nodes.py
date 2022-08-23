@@ -8,9 +8,9 @@ from typing import Any, Iterable, List
 
 import beanmachine.ppl.compiler.bmg_types as bt
 import torch
+from beanmachine.ppl.model.rv_identifier import RVIdentifier
 from beanmachine.ppl.utils.item_counter import ItemCounter
 from torch import Tensor
-
 
 # Note that we're not going to subclass list or UserList here because we
 # only need to use the most basic list operations: initialization, getting
@@ -806,6 +806,14 @@ class LessThanEqualNode(ComparisonNode):
         return f"({str(self.left)}<={str(self.right)})"
 
 
+class ElementwiseMultiplyNode(BinaryOperatorNode):
+    def __init__(self, left: BMGNode, right: BMGNode):
+        BinaryOperatorNode.__init__(self, left, right)
+
+    def __str__(self) -> str:
+        return f"{self.left} * {self.right}"
+
+
 class EqualNode(ComparisonNode):
     def __init__(self, left: BMGNode, right: BMGNode):
         ComparisonNode.__init__(self, left, right)
@@ -1035,6 +1043,17 @@ class MatrixMultiplicationNode(BinaryOperatorNode):
         return "(" + str(self.left) + "*" + str(self.right) + ")"
 
 
+class MatrixAddNode(BinaryOperatorNode):
+    """This represents an exponentiation operation; it is generated when
+    a model contains calls to Tensor.exp or math.exp."""
+
+    def __init__(self, left: BMGNode, right: BMGNode):
+        BinaryOperatorNode.__init__(self, left, right)
+
+    def __str__(self) -> str:
+        return f"{self.left} + {self.right}"
+
+
 class MatrixScaleNode(BinaryOperatorNode):
     """This represents a matrix scaling."""
 
@@ -1181,6 +1200,25 @@ class Log1mexpNode(UnaryOperatorNode):
 
     def __str__(self) -> str:
         return "Log1mexp(" + str(self.operand) + ")"
+
+
+class MatrixExpNode(UnaryOperatorNode):
+    """This represents an exponentiation operation; it is generated when
+    a model contains calls to Tensor.exp or math.exp."""
+
+    def __init__(self, operand: BMGNode):
+        UnaryOperatorNode.__init__(self, operand)
+
+    def __str__(self) -> str:
+        return "MatrixExp(" + str(self.operand) + ")"
+
+
+class MatrixSumNode(UnaryOperatorNode):
+    def __init__(self, operand: BMGNode):
+        UnaryOperatorNode.__init__(self, operand)
+
+    def __str__(self) -> str:
+        return "MatrixSum(" + str(self.operand) + ")"
 
 
 class TransposeNode(UnaryOperatorNode):
@@ -1467,13 +1505,18 @@ class Query(BMGNode):
     # need to represent a query as a *node*, and BMG does not
     # do so. We might wish to follow this pattern as well.
 
-    def __init__(self, operator: BMGNode):
+    def __init__(self, operator: BMGNode, rvidentifier: RVIdentifier):
         BMGNode.__init__(self, [operator])
+        self._rvidentifier = rvidentifier
 
     @property
     def operator(self) -> BMGNode:
         c = self.inputs[0]
         return c
+
+    @property
+    def rv_identifier(self) -> RVIdentifier:
+        return self._rvidentifier
 
     def __str__(self) -> str:
         return "Query(" + str(self.operator) + ")"

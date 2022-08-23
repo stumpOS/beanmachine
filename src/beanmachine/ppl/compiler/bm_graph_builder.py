@@ -14,6 +14,7 @@ import torch
 import torch.distributions as dist
 from beanmachine.ppl.compiler.bmg_nodes import BMGNode, ConstantNode
 from beanmachine.ppl.compiler.execution_context import ExecutionContext
+from beanmachine.ppl.model.rv_identifier import RVIdentifier
 from beanmachine.ppl.utils.memoize import memoize
 
 
@@ -1005,13 +1006,45 @@ class BMGraphBuilder:
         return node
 
     @memoize
-    def add_query(self, operator: BMGNode) -> bn.Query:
+    def add_query(self, operator: BMGNode, rvidentifier: RVIdentifier) -> bn.Query:
         # TODO: BMG requires that the target of a query be classified
         # as an operator and that queries be unique; that is, every node
         # is queried *exactly* zero or one times. Rather than making
         # those restrictions here, instead detect bad queries in the
         # problem fixing phase and report accordingly.
-        node = bn.Query(operator)
+        node = bn.Query(operator, rvidentifier)
+        self.add_node(node)
+        return node
+
+    @memoize
+    def add_elementwise_multiplication(self, left: BMGNode, right: BMGNode) -> BMGNode:
+        if isinstance(left, ConstantNode) and isinstance(right, ConstantNode):
+            return self.add_constant(left.value * right.value)
+        node = bn.ElementwiseMultiplyNode(left, right)
+        self.add_node(node)
+        return node
+
+    @memoize
+    def add_matrix_addition(self, left: BMGNode, right: BMGNode) -> BMGNode:
+        if isinstance(left, ConstantNode) and isinstance(right, ConstantNode):
+            return self.add_constant(left.value + right.value)
+        node = bn.MatrixAddNode(left, right)
+        self.add_node(node)
+        return node
+
+    @memoize
+    def add_matrix_sum(self, matrix: BMGNode) -> BMGNode:
+        if isinstance(matrix, ConstantNode):
+            return self.add_constant(matrix.value.sum())
+        node = bn.MatrixSumNode(matrix)
+        self.add_node(node)
+        return node
+
+    @memoize
+    def add_matrix_exp(self, matrix: BMGNode) -> BMGNode:
+        if isinstance(matrix, ConstantNode):
+            return self.add_constant(matrix.value.exp())
+        node = bn.MatrixExpNode(matrix)
         self.add_node(node)
         return node
 
@@ -1116,3 +1149,11 @@ class BMGraphBuilder:
             (n for n in self._nodes if isinstance(n, bn.Observation)),
             key=lambda n: self._nodes[n],
         )
+
+
+def rv_to_query(bmg: BMGraphBuilder) -> Dict[RVIdentifier, bn.Query]:
+    rv_to_query_map: Dict[RVIdentifier, bn.Query] = {}
+    for node in bmg.all_nodes():
+        if isinstance(node, bn.Query):
+            rv_to_query_map[node.rv_identifier] = node
+    return rv_to_query_map
