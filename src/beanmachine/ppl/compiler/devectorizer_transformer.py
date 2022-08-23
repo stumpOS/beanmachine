@@ -5,7 +5,7 @@
 
 import typing
 from enum import Enum
-from typing import Any, Callable, Dict, List
+from typing import Callable, Dict, List
 
 import beanmachine.ppl.compiler.bmg_nodes as bn
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
@@ -25,14 +25,11 @@ from beanmachine.ppl.compiler.fix_problem import (
 from beanmachine.ppl.compiler.sizer import is_scalar, Size, Sizer, Unsized
 from beanmachine.ppl.compiler.tensorizer_transformer import Tensorizer
 
-# elements in this list operate over tenosr but do not necessarily produce tensors
+# elements in this list operate over tensors (all parameters are tensors) but do not necessarily produce tensors
 _unary_tensor_ops = [
-    bn.LogSumExpNode,
     bn.LogSumExpVectorNode,
-    bn.LogSumExpTorchNode,
     bn.MatrixExpNode,
     bn.MatrixSumNode,
-    # bn.SumNode,
     bn.TransposeNode,
     bn.ToPositiveRealMatrixNode,
     bn.ToRealMatrixNode,
@@ -154,6 +151,20 @@ def _parameter_to_type_matrix_scale(
         )
 
 
+def _parameter_to_type_log_sum_exp(node: bn.LogSumExpNode, index: int) -> ElementType:
+    return ElementType.SCALAR
+
+
+def _parameter_to_type_torch_log_sum_exp(
+    node: bn.LogSumExpTorchNode, index: int
+) -> ElementType:
+    assert index <= 2
+    if index == 0:
+        return ElementType.TENSOR
+    if index <= 2:
+        return ElementType.SCALAR
+
+
 class Devectorizer(NodeTransformer):
     def __init__(self, cloner: Cloner, sizer: Sizer):
         self.copy_context = CopyContext()
@@ -164,11 +175,27 @@ class Devectorizer(NodeTransformer):
             bn.ColumnIndexNode: lambda n, i: _parameter_to_type_single_index(i),
             bn.VectorIndexNode: lambda n, i: _parameter_to_type_single_index(i),
             bn.SampleNode: _parameter_to_type_sample,
+            bn.LogSumExpNode: _parameter_to_type_log_sum_exp,
+            bn.LogSumExpTorchNode: _parameter_to_type_torch_log_sum_exp,
             bn.Query: lambda n, i: _parameter_to_type_query(self.sizer, n, i),
             bn.Observation: _parameter_to_type_obs,
             bn.MatrixScaleNode: _parameter_to_type_matrix_scale,
             bn.IndexNode: _parameter_to_type_multi_index,
+            bn.SwitchNode: self._parameter_to_type_switch,
         }
+
+    def _parameter_to_type_switch(self, node: bn.SwitchNode, index: int) -> ElementType:
+        if index == 0 or index % 2 == 1:
+            return ElementType.SCALAR
+        else:
+            operand_of_concern = node.inputs.inputs[index]
+            size = self.sizer[operand_of_concern]
+            if size == Unsized:
+                raise ValueError("every node should have been sized")
+            if is_scalar(size):
+                return ElementType.SCALAR
+            else:
+                return ElementType.TENSOR
 
     def __requires_element_type_at(self, node: bn.BMGNode, index: int) -> ElementType:
         node_type = type(node)
@@ -386,7 +413,9 @@ class Devectorizer(NodeTransformer):
         if isinstance(node, bn.Observation):
             dim = len(node.value.size())
             values = []
-            if dim == 1:
+            if dim == 0:
+                values.append(node.value.item())
+            elif dim == 1:
                 for i in range(0, node.value.size()[0]):
                     values.append(node.value[i])
             else:
@@ -398,16 +427,18 @@ class Devectorizer(NodeTransformer):
             return self.__flatten_parents_with_index(
                 node,
                 parents,
-                lambda i, s: self.__add_observation(s, values[i]),
+                lambda i, s: self.__add_observation(s, i, values),
             )
         else:
             raise NotImplementedError()
 
-    def __add_observation(self, inputs: List[bn.BMGNode], value: Any) -> bn.Observation:
+    def __add_observation(
+        self, inputs: List[bn.BMGNode], i: int, value: List
+    ) -> bn.Observation:
         assert len(inputs) == 1
         sample = inputs[0]
         if isinstance(sample, bn.SampleNode):
-            return self.cloner.bmg.add_observation(sample, value)
+            return self.cloner.bmg.add_observation(sample, value[i])
         else:
             raise ValueError("expected a sample as a parent to an observation")
 
