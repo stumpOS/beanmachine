@@ -9,6 +9,8 @@ import unittest
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.fix_problems import fix_problems
 from beanmachine.ppl.compiler.gen_dot import to_dot
+
+from beanmachine.ppl.model.rv_identifier import RVIdentifier
 from torch import tensor
 
 
@@ -38,7 +40,7 @@ class FixProblemsTest(unittest.TestCase):
         bern = bmg.add_bernoulli(mult)
         bmg.add_sample(norm)
         bmg.add_sample(bern)
-        bmg.add_query(mult)
+        bmg.add_query(mult, RVIdentifier(wrapper=lambda a, b: a, arguments=(1, 1)))
 
         observed = to_dot(
             bmg,
