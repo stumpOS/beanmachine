@@ -3085,55 +3085,54 @@ digraph "graph" {
   N01[label=Query];
   N02[label=3.0];
   N03[label=Query];
-  N04[label=4.0];
-  N05[label=Query];
-  N06[label=2.0];
-  N07[label=Beta];
-  N08[label=Sample];
-  N09[label=ToReal];
-  N10[label=-5.0];
-  N11[label="+"];
-  N12[label=Query];
-  N13[label=-6.0];
-  N14[label="+"];
-  N15[label=Query];
-  N16[label=-7.0];
-  N17[label="+"];
-  N18[label=Query];
-  N19[label=8.0];
-  N20[label=Query];
-  N21[label=-9.0];
-  N22[label="+"];
-  N23[label=Query];
+  N04[label=Query];
+  N05[label=4.0];
+  N06[label=Query];
+  N07[label=2.0];
+  N08[label=Beta];
+  N09[label=Sample];
+  N10[label=ToReal];
+  N11[label=-5.0];
+  N12[label="+"];
+  N13[label=Query];
+  N14[label=-6.0];
+  N15[label="+"];
+  N16[label=Query];
+  N17[label=-7.0];
+  N18[label="+"];
+  N19[label=Query];
+  N20[label=8.0];
+  N21[label=Query];
+  N22[label=-9.0];
+  N23[label="+"];
+  N24[label=Query];
   N00 -> N01;
   N02 -> N03;
-  N04 -> N05;
-  N06 -> N07;
-  N06 -> N07;
+  N02 -> N04;
+  N05 -> N06;
+  N07 -> N08;
   N07 -> N08;
   N08 -> N09;
-  N09 -> N11;
-  N09 -> N14;
-  N09 -> N17;
-  N09 -> N22;
-  N10 -> N11;
+  N09 -> N10;
+  N10 -> N12;
+  N10 -> N15;
+  N10 -> N18;
+  N10 -> N23;
   N11 -> N12;
-  N13 -> N14;
+  N12 -> N13;
   N14 -> N15;
-  N16 -> N17;
+  N15 -> N16;
   N17 -> N18;
-  N19 -> N20;
-  N21 -> N22;
+  N18 -> N19;
+  N20 -> N21;
   N22 -> N23;
+  N23 -> N24;
 }
 """
-        self.assertEqual(observed.strip(), expected.strip())
+        self.assertEqual(expected.strip(), observed.strip())
 
     def test_bmg_arithmetic_sum(self) -> None:
         self.maxDiff = None
-
-        # TODO: sum operators are not yet properly supported by the compiler/BMG;
-        # update this test when we get them working.
 
         queries = [
             sum_1(),
@@ -3155,30 +3154,40 @@ digraph "graph" {
   N08[label=1.0];
   N09[label=Normal];
   N10[label=Sample];
-  N11[label=ToReal];
-  N12[label=3.0];
-  N13[label="+"];
-  N14[label=Query];
-  N15[label=4.0];
-  N16[label="+"];
+  N11[label=3];
+  N12[label=1];
+  N13[label=ToReal];
+  N14[label=3.0];
+  N15[label=ToMatrix];
+  N16[label=MatrixSum];
   N17[label=Query];
+  N18[label=4.0];
+  N19[label=ToMatrix];
+  N20[label=MatrixSum];
+  N21[label=Query];
   N00 -> N01;
   N02 -> N03;
   N04 -> N05;
   N04 -> N05;
   N05 -> N06;
-  N06 -> N11;
+  N06 -> N13;
   N07 -> N09;
   N08 -> N09;
   N09 -> N10;
-  N10 -> N13;
-  N10 -> N16;
-  N11 -> N13;
-  N11 -> N16;
-  N12 -> N13;
-  N13 -> N14;
+  N10 -> N15;
+  N10 -> N19;
+  N11 -> N15;
+  N11 -> N19;
+  N12 -> N15;
+  N12 -> N19;
+  N13 -> N15;
+  N13 -> N19;
+  N14 -> N15;
   N15 -> N16;
   N16 -> N17;
+  N18 -> N19;
+  N19 -> N20;
+  N20 -> N21;
 }
 """
         observed = BMGInference().to_dot(queries, {})
