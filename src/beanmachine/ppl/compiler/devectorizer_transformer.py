@@ -161,7 +161,7 @@ def _parameter_to_type_torch_log_sum_exp(
     assert index <= 2
     if index == 0:
         return ElementType.TENSOR
-    if index <= 2:
+    else:
         return ElementType.SCALAR
 
 
