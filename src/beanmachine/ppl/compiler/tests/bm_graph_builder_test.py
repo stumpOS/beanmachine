@@ -12,7 +12,7 @@ from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.gen_bmg_cpp import to_bmg_cpp
 from beanmachine.ppl.compiler.gen_bmg_graph import to_bmg_graph
 from beanmachine.ppl.compiler.gen_bmg_python import to_bmg_python
-from beanmachine.ppl.compiler.gen_dot import to_dot
+from beanmachine.ppl.compiler.gen_dot import to_dot, to_dot_get_graph
 from beanmachine.ppl.compiler.runtime import BMGRuntime
 from torch import Tensor
 
@@ -54,7 +54,7 @@ class BMGraphBuilderTest(unittest.TestCase):
         bmg.add_observation(samp, True)
         bmg.add_query(mult)
 
-        observed = to_dot(bmg, label_edges=False)
+        bmg, observed = to_dot_get_graph(bmg, label_edges=False)
         expected = """
 digraph "graph" {
   N0[label=0.5];
@@ -162,7 +162,7 @@ uint q0 = g.query(n7);
         # by default. If you want them gone, the "after_transform" flag does
         # a type check and also removes everything that is not an ancestor
         # of a query or observation.
-        observed = to_dot(bmg, label_edges=False)
+        bmg, observed = to_dot_get_graph(bmg, label_edges=False)
         expected = """
 digraph "graph" {
   N00[label=1];
@@ -322,7 +322,7 @@ digraph "graph" {
             bmg.remove_leaf(s)
 
         bmg.remove_leaf(o)
-        observed = to_dot(bmg)
+        bmg, observed = to_dot_get_graph(bmg)
         expected = """
 digraph "graph" {
   N0[label=0.5];

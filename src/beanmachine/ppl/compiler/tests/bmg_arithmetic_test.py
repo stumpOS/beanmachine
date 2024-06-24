@@ -11,6 +11,8 @@ import operator
 import unittest
 
 import beanmachine.ppl as bm
+
+import beanmachine.ppl.compiler.fix_problems
 import numpy as np
 import torch
 from beanmachine.ppl.inference.bmg_inference import BMGInference
@@ -1797,8 +1799,9 @@ The unsupported node was created in function call not_9().
 
     def test_bmg_arithmetic_float(self) -> None:
         self.maxDiff = None
-
-        observed = BMGInference().to_dot([to_real_1(), to_real_2()], {})
+        inference = BMGInference()
+        inference._devectorize = True
+        observed = inference.to_dot([to_real_1(), to_real_2()], {})
         expected = """
 digraph "graph" {
   N0[label=0.5];
@@ -1826,8 +1829,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_log(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 log_1(),
                 log_2(),
@@ -1890,8 +1895,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_log10(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 log10_1(),
                 log10_2(),
@@ -1960,8 +1967,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_log1p(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 log1p_1(),
                 log1p_2(),
@@ -2046,8 +2055,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_log2(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 log2_1(),
                 log2_2(),
@@ -2116,8 +2127,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_sqrt(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 sqrt_1(),
                 sqrt_2(),
@@ -2180,8 +2193,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_pow(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 pow_1(),
                 pow_2(),
@@ -2250,8 +2265,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_neg(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 neg_1(),
                 neg_2(),
@@ -2328,8 +2345,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_add(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 add_1(),
                 add_2(),
@@ -2398,6 +2417,8 @@ digraph "graph" {
 
     def test_bmg_arithmetic_and(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # & operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2414,7 +2435,7 @@ digraph "graph" {
             and_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'bitwise and' (&) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call and_5().
@@ -2430,8 +2451,10 @@ The unsupported node was created in function call and_9().
 
     def test_bmg_arithmetic_div(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 div_1(),
                 div_2(),
@@ -2498,6 +2521,8 @@ digraph "graph" {
 
     def test_bmg_arithmetic_eq(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # "==" operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2514,7 +2539,7 @@ digraph "graph" {
             eq_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses an equality (==) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call eq_5().
@@ -2529,7 +2554,8 @@ The unsupported node was created in function call eq_9().
         self.assertEqual(observed.strip(), expected.strip())
 
     def test_bmg_arithmetic_floordiv(self) -> None:
-
+        inference = BMGInference()
+        inference._devectorize = True
         self.skipTest(
             "Disabling floordiv tests; produces a deprecation warning in torch."
         )
@@ -2567,6 +2593,8 @@ The unsupported node was created in function call floordiv_9().
 
     def test_bmg_arithmetic_ge(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # ">=" operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2583,7 +2611,7 @@ The unsupported node was created in function call floordiv_9().
             ge_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'greater than or equal' (>=) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call ge_5().
@@ -2599,6 +2627,8 @@ The unsupported node was created in function call ge_9().
 
     def test_bmg_arithmetic_gt(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # ">=" operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2615,7 +2645,7 @@ The unsupported node was created in function call ge_9().
             gt_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'greater than' (>) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call gt_5().
@@ -2631,6 +2661,8 @@ The unsupported node was created in function call gt_9().
 
     def test_bmg_arithmetic_in(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # in and not in operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2646,7 +2678,7 @@ The unsupported node was created in function call gt_9().
             not_in_3(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'not in' operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call not_in_3().
@@ -2660,6 +2692,8 @@ The unsupported node was created in function call in_5().
 
     def test_bmg_arithmetic_is(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # is and is not operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2675,7 +2709,7 @@ The unsupported node was created in function call in_5().
             is_not_4(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses an 'is not' operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call is_not_2().
@@ -2690,6 +2724,8 @@ The unsupported node was created in function call is_4()."""
 
     def test_bmg_arithmetic_inv(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # ~ operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2706,7 +2742,7 @@ The unsupported node was created in function call is_4()."""
             inv_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'bitwise invert' (~) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call inv_5().
@@ -2722,6 +2758,8 @@ The unsupported node was created in function call inv_9().
 
     def test_bmg_arithmetic_le(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # "<=" operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2738,7 +2776,7 @@ The unsupported node was created in function call inv_9().
             le_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'less than or equal' (<=) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call le_5().
@@ -2754,6 +2792,8 @@ The unsupported node was created in function call le_9().
 
     def test_bmg_arithmetic_lshift(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # << operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2770,7 +2810,7 @@ The unsupported node was created in function call le_9().
             lshift_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'left shift' (<<) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call lshift_5().
@@ -2786,6 +2826,8 @@ The unsupported node was created in function call lshift_9().
 
     def test_bmg_arithmetic_lt(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # "<" operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2802,7 +2844,7 @@ The unsupported node was created in function call lshift_9().
             lt_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'less than' (<) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call lt_5().
@@ -2818,6 +2860,8 @@ The unsupported node was created in function call lt_9().
 
     def test_bmg_arithmetic_mod(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # % operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2834,7 +2878,7 @@ The unsupported node was created in function call lt_9().
             mod_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a modulus (%) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call mod_5().
@@ -2850,8 +2894,10 @@ The unsupported node was created in function call mod_9().
 
     def test_bmg_arithmetic_mul(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 mul_1(),
                 mul_2(),
@@ -2920,6 +2966,8 @@ digraph "graph" {
 
     def test_bmg_arithmetic_ne(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # "!=" operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2936,7 +2984,7 @@ digraph "graph" {
             ne_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses an inequality (!=) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call ne_5().
@@ -2952,6 +3000,8 @@ The unsupported node was created in function call ne_9().
 
     def test_bmg_arithmetic_or(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # & operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -2968,7 +3018,7 @@ The unsupported node was created in function call ne_9().
             or_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'bitwise or' (|) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call or_5().
@@ -2984,6 +3034,8 @@ The unsupported node was created in function call or_9().
 
     def test_bmg_arithmetic_rshift(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # >> operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -3000,7 +3052,7 @@ The unsupported node was created in function call or_9().
             rshift_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'right shift' (>>) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call rshift_5().
@@ -3016,8 +3068,10 @@ The unsupported node was created in function call rshift_9().
 
     def test_bmg_arithmetic_pos(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 pos_1(),
                 pos_2(),
@@ -3064,8 +3118,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_sub(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 sub_1(),
                 sub_2(),
@@ -3131,6 +3187,8 @@ digraph "graph" {
 
     def test_bmg_arithmetic_sum(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # TODO: sum operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -3181,12 +3239,14 @@ digraph "graph" {
   N16 -> N17;
 }
 """
-        observed = BMGInference().to_dot(queries, {})
+        observed = inference.to_dot(queries, {})
 
         self.assertEqual(expected.strip(), observed.strip())
 
     def test_bmg_arithmetic_xor(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # ^ operators are not yet properly supported by the compiler/BMG;
         # update this test when we get them working.
@@ -3203,7 +3263,7 @@ digraph "graph" {
             xor_9(),
         ]
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer(queries, {}, 1)
+            inference.infer(queries, {}, 1)
         expected = """
 The model uses a 'bitwise xor' (^) operation unsupported by Bean Machine Graph.
 The unsupported node was created in function call xor_5().
@@ -3219,8 +3279,10 @@ The unsupported node was created in function call xor_9().
 
     def test_bmg_arithmetic_exp(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 exp_1(),
                 exp_2(),
@@ -3280,12 +3342,14 @@ digraph "graph" {
   N22 -> N23;
 }
 """
-        self.assertEqual(observed.strip(), expected.strip())
+        self.assertEqual(expected.strip(), observed.strip())
 
     def test_bmg_arithmetic_exp2(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot(
+        observed = inference.to_dot(
             [
                 exp2_1(),
                 exp2_2(),
@@ -3361,8 +3425,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_expm1(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot([expm1_prob()], {})
+        observed = inference.to_dot([expm1_prob()], {})
         expected = """
 digraph "graph" {
   N0[label=2.0];
@@ -3380,7 +3446,7 @@ digraph "graph" {
 }"""
         self.assertEqual(observed.strip(), expected.strip())
 
-        observed = BMGInference().to_dot([expm1_real()], {})
+        observed = inference.to_dot([expm1_real()], {})
         expected = """
 digraph "graph" {
   N0[label=0.0];
@@ -3397,7 +3463,7 @@ digraph "graph" {
 }"""
         self.assertEqual(observed.strip(), expected.strip())
 
-        observed = BMGInference().to_dot([expm1_negreal()], {})
+        observed = inference.to_dot([expm1_negreal()], {})
         expected = """
 digraph "graph" {
   N0[label=1.0];
@@ -3416,8 +3482,10 @@ digraph "graph" {
 
     def test_bmg_arithmetic_logistic(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
-        observed = BMGInference().to_dot([logistic_prob()], {})
+        observed = inference.to_dot([logistic_prob()], {})
         expected = """
 digraph "graph" {
   N0[label=2.0];
@@ -3435,7 +3503,7 @@ digraph "graph" {
 }"""
         self.assertEqual(observed.strip(), expected.strip())
 
-        observed = BMGInference().to_dot([logistic_real()], {})
+        observed = inference.to_dot([logistic_real()], {})
         expected = """
 digraph "graph" {
   N0[label=0.0];
@@ -3452,7 +3520,7 @@ digraph "graph" {
 }"""
         self.assertEqual(observed.strip(), expected.strip())
 
-        observed = BMGInference().to_dot([logistic_negreal()], {})
+        observed = inference.to_dot([logistic_negreal()], {})
         expected = """
 digraph "graph" {
   N0[label=1.0];
@@ -3473,7 +3541,9 @@ digraph "graph" {
 
     def test_bmg_misc_arithmetic(self) -> None:
         self.maxDiff = None
-        observed = BMGInference().to_dot([stochastic_arithmetic()], {})
+        inference = BMGInference()
+        inference._devectorize = True
+        observed = inference.to_dot([stochastic_arithmetic()], {})
         expected = """
 digraph "graph" {
   N00[label=0.5];
@@ -3521,7 +3591,9 @@ digraph "graph" {
         # a neg-of-neg situation, the optimizer then removes both of them.
 
         self.maxDiff = None
-        observed = BMGInference().to_dot([neg_of_neg()], {})
+        inference = BMGInference()
+        inference._devectorize = True
+        observed = inference.to_dot([neg_of_neg()], {})
         expected = """
 digraph "graph" {
   N0[label=0.0];
@@ -3553,7 +3625,9 @@ digraph "graph" {
         # Beta -> Sample -> ToReal -> Negate -> MultiAdd
 
         self.maxDiff = None
-        observed = BMGInference().to_dot([subtractions()], {})
+        inference = BMGInference()
+        inference._devectorize = True
+        observed = inference.to_dot([subtractions()], {})
         expected = """
 digraph "graph" {
   N00[label=0.0];
@@ -3602,8 +3676,10 @@ digraph "graph" {
 
     def test_unsupported_operands(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
         with self.assertRaises(ValueError) as ex:
-            BMGInference().infer([unsupported_add()], {}, 1)
+            inference.infer([unsupported_add()], {}, 1)
         expected = (
             "A constant value used as an operand of a stochastic "
             + "operation is required to be bool, int, float or tensor. "
@@ -3614,9 +3690,11 @@ digraph "graph" {
 
     def test_tensor_mutations_augmented_assignment(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
+        inference._devectorize = True
 
         # See notes in mutating_assignments() for details
-        observed = BMGInference().to_dot([mutating_assignments()], {})
+        observed = inference.to_dot([mutating_assignments()], {})
         expected = """
 digraph "graph" {
   N0[label=2.0];
@@ -3643,8 +3721,9 @@ digraph "graph" {
 
     def test_numpy_operand(self) -> None:
         self.maxDiff = None
+        inference = BMGInference()
 
-        observed = BMGInference().to_dot([numpy_operand()], {})
+        observed = inference.to_dot([numpy_operand()], {})
         expected = """
 digraph "graph" {
   N0[label=2.0];

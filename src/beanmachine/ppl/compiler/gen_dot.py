@@ -6,7 +6,7 @@
 """
 Visualize the contents of a builder in the DOT graph language.
 """
-from typing import Set
+from typing import Set, Tuple
 
 from beanmachine.ppl.compiler.bm_graph_builder import BMGraphBuilder
 from beanmachine.ppl.compiler.bmg_requirements import EdgeRequirements
@@ -20,15 +20,15 @@ from beanmachine.ppl.compiler.sizer import size_to_str, Sizer
 from beanmachine.ppl.utils.dotbuilder import DotBuilder
 
 
-def to_dot(
-    bmg: BMGraphBuilder,
+def to_dot_get_graph(
+    bmg_raw: BMGraphBuilder,
     node_types: bool = False,
     node_sizes: bool = False,
     edge_requirements: bool = False,
     after_transform: bool = False,
     label_edges: bool = True,
     skip_optimizations: Set[str] = default_skip_optimizations,
-) -> str:
+) -> Tuple[BMGraphBuilder, str]:
     """This dumps the entire accumulated graph state, including
     orphans, as a DOT graph description; nodes are enumerated in the order
     they were created."""
@@ -48,10 +48,12 @@ def to_dot(
         #
         # * Add a whole_graph flag, default to true, which decides
         #   whether to graph the whole thing or not.
-        fix_problems(bmg, skip_optimizations).raise_errors()
+        bmg, error_report = fix_problems(bmg_raw, skip_optimizations)
+        error_report.raise_errors()
         node_list = bmg.all_ancestor_nodes()
     else:
-        node_list = bmg.all_nodes()
+        bmg = bmg_raw
+        node_list = bmg_raw.all_nodes()
 
     nodes = {}
     for index, node in enumerate(node_list):
@@ -88,4 +90,24 @@ def to_dot(
             start_node = to_id(nodes[i])
             end_node = n
             db.with_edge(start_node, end_node, edge_label)
-    return str(db)
+    return bmg, str(db)
+
+
+def to_dot(
+    bmg_raw: BMGraphBuilder,
+    node_types: bool = False,
+    node_sizes: bool = False,
+    edge_requirements: bool = False,
+    after_transform: bool = False,
+    label_edges: bool = True,
+    skip_optimizations: Set[str] = default_skip_optimizations,
+) -> str:
+    return to_dot_get_graph(
+        bmg_raw,
+        node_types,
+        node_sizes,
+        edge_requirements,
+        after_transform,
+        label_edges,
+        skip_optimizations,
+    )[1]
